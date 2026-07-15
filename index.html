@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2218%22 fill=%22%236B1F2A%22/><text x=%2250%22 y=%2268%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22%23D4A94A%22>&%239733;</text></svg>">
+<title>Precessio — motore archeoastronomico</title>
+<style>
+  :root { --bord:#6B1F2A; --gold:#D4A94A; --goldl:#EAD9A8; --bg:#160A0D; --panel:#241014; }
+  body { background:var(--bg); color:var(--goldl); font-family:Georgia,'Times New Roman',serif; margin:0; padding:18px; }
+  h1 { color:var(--goldl); text-align:center; letter-spacing:3px; margin:6px 0 0; font-size:34px; }
+  .sub { text-align:center; color:var(--gold); font-style:italic; margin:2px 0 16px; font-size:14px; }
+  .wrap { max-width:1000px; margin:0 auto; }
+  .panel { background:var(--panel); border:2px solid var(--bord); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+  label { color:var(--gold); font-size:13px; display:block; margin-bottom:3px; }
+  select,input { background:#1d0d10; color:var(--goldl); border:1px solid var(--bord); border-radius:4px; padding:6px 8px; font-family:inherit; font-size:14px; width:100%; box-sizing:border-box; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
+  th { background:var(--bord); color:#fff; padding:5px 8px; text-align:left; font-weight:normal; }
+  td { padding:5px 8px; border-bottom:1px solid #3a1a20; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .never { color:#c98; font-style:italic; }
+  canvas { width:100%; background:var(--bg); border:2px solid var(--bord); border-radius:6px; display:block; }
+  .foot { text-align:center; color:var(--gold); font-size:11.5px; margin-top:10px; }
+  .epoca { color:var(--goldl); font-size:20px; text-align:center; margin:6px 0 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>P R E C E S S I O</h1>
+  <div class="sub">motore archeoastronomico &middot; modello Vondr&aacute;k&ndash;Capitaine&ndash;Wallace (2011) &middot; moto proprio 3D &middot; valido &plusmn;100.000 anni</div>
+
+  <div class="panel">
+    <div class="grid">
+      <div><label>Sito</label>
+        <select id="site" onchange="siteChanged()">
+          <option value="29.9792,31.1342">Giza (Grande Piramide)</option>
+          <option value="37.2231,38.9225">G&ouml;bekli Tepe</option>
+          <option value="51.1789,-1.8262">Stonehenge</option>
+          <option value="-16.5544,-68.6733">Tiwanaku</option>
+          <option value="-9.9,-67.8">Acre (geoglifi)</option>
+          <option value="custom">Personalizzato&hellip;</option>
+        </select></div>
+      <div><label>Latitudine (&deg;)</label><input id="lat" type="number" step="0.0001" value="29.9792"></div>
+      <div><label>Anno (negativo = a.C. astron.; 9999 a.C. = -9998)</label><input id="year" type="number" step="10" value="-12099"></div>
+      <div><label>Altezza orizzonte h&#8320; (&deg;)</label><input id="h0" type="number" step="0.1" value="0"></div>
+      <div><label>Scena del cielo</label>
+        <select id="scene">
+          <option value="dawn">Alba equinozio di primavera</option>
+          <option value="culm">Culminazione di Alnilam (Cintura)</option>
+        </select></div>
+      <div style="display:flex;align-items:flex-end"><input type="button" value="CALCOLA" onclick="run()" style="background:var(--bord);color:#fff;cursor:pointer;font-size:15px;letter-spacing:2px"></div>
+    </div>
+  </div>
+
+  <div class="epoca" id="epoca"></div>
+  <div class="panel">
+    <table id="tab"><thead><tr>
+      <th>Stella</th><th>Dec di data</th><th>Az levata</th><th>Az tramonto</th><th>h culminazione</th><th>Nella scena: az / h</th>
+    </tr></thead><tbody></tbody></table>
+    <table id="sun"><thead><tr><th>Sole</th><th>Az levata</th><th>Az tramonto</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="panel"><canvas id="sky" width="1000" height="430"></canvas></div>
+  <div class="foot">Precessio v0.1 &middot; coefficienti identici a Stellarium (Vondr&aacute;k et al., A&amp;A 534, A22) &middot; laboratorio ADE 444 &middot; risultati riproducibili</div>
+</div>
+
+<script>
+const AS2R = Math.PI/(180*3600), EPS0 = 84381.406*AS2R, D2R = Math.PI/180, R2D = 180/Math.PI;
+const precVals = [
+ [1/402.90,-22206.325946,1267.727824,-13765.924050,-3243.236469,-8571.476251,-2206.967126],
+ [1/256.75,12236.649447,1702.324248,13511.858383,-3969.723769,5309.796459,-4186.752711],
+ [1/292.00,-1589.008343,-2970.553839,-1455.229106,7099.207893,-610.393953,6737.949677],
+ [1/537.22,2482.103195,693.790312,1054.394467,-1903.696711,923.201931,-856.922846],
+ [1/241.45,150.322920,-14.724451,0,146.435014,3.759055,0],
+ [1/375.22,-13.632066,-516.649401,-112.300144,1300.630106,-40.691114,957.149088],
+ [1/157.87,389.437420,-356.794454,202.769908,1727.498039,80.437484,1709.440735],
+ [1/274.20,2031.433792,-129.552058,1936.050095,299.854055,807.300668,154.425505],
+ [1/203.00,363.748303,256.129314,0,-1217.125982,83.712326,0],
+ [1/440.00,-896.747562,190.266114,-655.484214,-471.367487,-368.654854,-243.520976],
+ [1/170.72,-926.995700,95.103991,-891.898637,-441.682145,-191.881064,-406.539008],
+ [1/713.37,37.070667,-332.907067,0,-86.169171,-4.263770,0],
+ [1/313.00,-597.682468,131.337633,0,-308.320429,-270.353691,0],
+ [1/128.38,66.282812,82.731919,-333.322021,-422.815629,11.602861,-446.656435],
+ [1/202.00,0,0,327.517465,0,0,-1049.071786],
+ [1/315.00,0,0,-494.780332,0,0,-301.504189],
+ [1/136.32,0,0,585.492621,0,0,41.348740],
+ [1/490.00,0,0,110.512834,0,0,142.525186]];
+const pEps = [
+ [1/409.90,-6908.287473,753.872780,-2845.175469,-1704.720302],
+ [1/396.15,-3198.706291,-247.805823,449.844989,-862.308358],
+ [1/537.22,1453.674527,379.471484,-1255.915323,447.832178],
+ [1/402.90,-857.748557,-53.880558,886.736783,-889.571909],
+ [1/417.15,1173.231614,-90.109153,418.887514,190.402846],
+ [1/288.92,-156.981465,-353.600190,997.912441,-56.564991],
+ [1/4043.0,371.836550,-63.115353,-240.979710,-296.222622],
+ [1/306.00,-216.619040,-28.248187,76.541307,-75.859952],
+ [1/277.00,193.691479,17.703387,-36.788069,67.473503],
+ [1/203.00,11.891524,38.911307,-170.964086,3.014055]];
+
+function angles(T){
+  const T2pi=T*2*Math.PI; let psi=0,ome=0,chi=0,eps=0;
+  for(const r of precVals){const p=T2pi*r[0],c=Math.cos(p),s=Math.sin(p);
+    psi+=r[1]*c+r[4]*s; ome+=r[2]*c+r[5]*s; chi+=r[3]*c+r[6]*s;}
+  for(const r of pEps){const p=T2pi*r[0],c=Math.cos(p),s=Math.sin(p);
+    eps+=r[2]*c+r[4]*s;}
+  psi+=((289e-9*T-0.00740913)*T+5042.7980307)*T+8473.343527;
+  ome+=((151e-9*T+0.00000146)*T-0.4436568)*T+84283.175915;
+  chi+=((-61e-9*T+0.00001472)*T+0.0790159)*T-19.657270;
+  eps+=((-110e-9*T-0.00004039)*T+0.3624445)*T+84028.206305;
+  return [psi*AS2R,ome*AS2R,chi*AS2R,eps*AS2R];
+}
+function R1(a){const c=Math.cos(a),s=Math.sin(a);return [[1,0,0],[0,c,s],[0,-s,c]];}
+function R3(a){const c=Math.cos(a),s=Math.sin(a);return [[c,s,0],[-s,c,0],[0,0,1]];}
+function mm(A,B){const M=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let i=0;i<3;i++)for(let j=0;j<3;j++)for(let k=0;k<3;k++)M[i][j]+=A[i][k]*B[k][j];return M;}
+function mv(A,v){return [A[0][0]*v[0]+A[0][1]*v[1]+A[0][2]*v[2],
+  A[1][0]*v[0]+A[1][1]*v[1]+A[1][2]*v[2], A[2][0]*v[0]+A[2][1]*v[1]+A[2][2]*v[2]];}
+function precMatrix(T){const [psi,ome,chi]=angles(T);
+  return mm(R3(chi),mm(R1(-ome),mm(R3(-psi),R1(EPS0))));}
+function vec(ra,dec){const r=ra*D2R,d=dec*D2R;
+  return [Math.cos(d)*Math.cos(r),Math.cos(d)*Math.sin(r),Math.sin(d)];}
+function radec(v){const n=Math.hypot(v[0],v[1],v[2]);
+  return [((Math.atan2(v[1],v[0])*R2D)+360)%360, Math.asin(v[2]/n)*R2D];}
+
+// catalogo: nome, RA, Dec, pmRA*, pmDec (mas/anno), mag, plx(mas), RV(km/s)
+const CAT = [
+ ["Alnitak",85.18969,-1.94257,3.19,2.03,1.77,0,0],
+ ["Alnilam",84.05339,-1.20192,1.49,-1.06,1.69,0,0],
+ ["Mintaka",83.00167,-0.29910,0.64,-0.69,2.23,0,0],
+ ["Betelgeuse",88.79294,7.40706,27.54,11.30,0.45,0,0],
+ ["Rigel",78.63446,-8.20164,1.31,0.50,0.13,0,0],
+ ["Bellatrix",81.28276,6.34970,-8.11,-12.88,1.64,0,0],
+ ["Saiph",86.93912,-9.66960,1.55,-1.20,2.07,0,0],
+ ["Sirio",101.28716,-16.71612,-546.01,-1223.07,-1.46,379.21,-5.5],
+ ["Procione",114.82550,5.22499,-714.59,-1036.80,0.37,284.56,-3.2],
+ ["Regolo",152.09296,11.96721,-249.40,4.91,1.36,41.13,5.9],
+ ["Denebola",177.26491,14.57206,-497.68,-114.67,2.14,90.91,-0.2],
+ ["Aldebaran",68.98016,16.50930,62.78,-189.36,0.87,48.94,54.3],
+ ["Canopo",95.98796,-52.69566,19.93,23.24,-0.72,0,0],
+ ["Capella",79.17232,45.99799,75.52,-427.11,0.08,76.20,29.9],
+ ["Deneb",310.35798,45.28034,1.99,1.95,1.25,0,0],
+ ["Vega",279.23473,38.78369,200.94,286.23,0.03,130.23,-13.9],
+ ["Spica",201.29824,-11.16132,-42.35,-30.67,0.97,0,0],
+ ["Antares",247.35192,-26.43200,-12.11,-23.30,1.06,0,0]];
+
+function starOfDate(s, year){
+  const [_,ra,dec,pmra,pmdec,mag,plx,rv]=[0,...s.slice(1)];
+  let raE, decE;
+  if(plx>0){
+    const d=1000/plx, rr=vec(ra,dec), rar=ra*D2R, der=dec*D2R;
+    const p=[-Math.sin(rar),Math.cos(rar),0];
+    const q=[-Math.sin(der)*Math.cos(rar),-Math.sin(der)*Math.sin(rar),Math.cos(der)];
+    const k=AS2R/1000, dt=year-2000;
+    const vt=[(pmra*k*p[0]+pmdec*k*q[0])*d,(pmra*k*p[1]+pmdec*k*q[1])*d,(pmra*k*p[2]+pmdec*k*q[2])*d];
+    const vr=rv*1.0227e-6;
+    const pos=[rr[0]*d+(vt[0]+vr*rr[0])*dt, rr[1]*d+(vt[1]+vr*rr[1])*dt, rr[2]*d+(vt[2]+vr*rr[2])*dt];
+    [raE,decE]=radec(pos);
+  } else {
+    const dt=year-2000;
+    decE=dec+pmdec*dt/3.6e6;
+    raE=ra+(pmra/Math.cos(dec*D2R))*dt/3.6e6;
+  }
+  const T=(year-2000)/100;
+  return radec(mv(precMatrix(T),vec(raE,decE)));
+}
+function altaz(ra,dec,lst,lat){
+  const H=(lst-ra)*D2R,d=dec*D2R,p=lat*D2R;
+  const alt=Math.asin(Math.sin(p)*Math.sin(d)+Math.cos(p)*Math.cos(d)*Math.cos(H));
+  const A=Math.atan2(-Math.cos(d)*Math.sin(H),Math.sin(d)*Math.cos(p)-Math.cos(d)*Math.sin(p)*Math.cos(H));
+  return [alt*R2D,((A*R2D)+360)%360];
+}
+function riseSet(dec,lat,h0){
+  const v=(Math.sin(dec*D2R)-Math.sin(h0*D2R)*Math.sin(lat*D2R))/(Math.cos(h0*D2R)*Math.cos(lat*D2R));
+  if(Math.abs(v)>1) return null;
+  const A=Math.acos(v)*R2D; return [A,360-A];
+}
+function fmt(x,dp=2){return (x>=0?"+":"")+x.toFixed(dp)+"\u00b0";}
+function bc(y){return y<=0 ? (1-y).toLocaleString('it')+" a.C." : y+" d.C.";}
+
+function siteChanged(){
+  const v=document.getElementById('site').value;
+  if(v!=="custom"){document.getElementById('lat').value=v.split(",")[0];}
+}
+function run(){
+  const lat=parseFloat(document.getElementById('lat').value);
+  const year=parseFloat(document.getElementById('year').value);
+  const h0=parseFloat(document.getElementById('h0').value);
+  const scene=document.getElementById('scene').value;
+  const T=(year-2000)/100;
+  document.getElementById('epoca').textContent="Cielo del "+bc(year)+" \u00b7 lat "+lat.toFixed(4)+"\u00b0";
+  // stelle
+  const pos={}; for(const s of CAT) pos[s[0]]=starOfDate(s,year);
+  let lst = scene==="dawn" ? 270 : pos["Alnilam"][0];
+  const tb=document.querySelector("#tab tbody"); tb.innerHTML="";
+  for(const s of CAT){
+    const [ra,dec]=pos[s[0]];
+    const rs=riseSet(dec,lat,h0);
+    const [alt,az]=altaz(ra,dec,lst,lat);
+    const hc=90-Math.abs(lat-dec)<90 ? 90-lat+dec : null;
+    const hcv = (lat>=0? 90-lat+dec : 90+lat-dec);
+    tb.insertAdjacentHTML("beforeend",
+      "<tr><td>"+s[0]+"</td><td class='num'>"+fmt(dec)+"</td>"+
+      (rs? "<td class='num'>"+rs[0].toFixed(1)+"\u00b0</td><td class='num'>"+rs[1].toFixed(1)+"\u00b0</td>"
+         : "<td colspan='2' class='never'>"+(Math.sign(dec)===Math.sign(lat)&&Math.abs(dec)>90-Math.abs(lat)?"circumpolare":"mai sopra l'orizzonte")+"</td>")+
+      "<td class='num'>"+fmt(hcv,1)+"</td><td class='num'>"+az.toFixed(1)+"\u00b0 / "+fmt(alt,1)+"</td></tr>");
+  }
+  // sole: equinozio e solstizi (obliquita' dell'epoca)
+  const eps=angles(T)[3]*R2D;
+  const st=document.querySelector("#sun tbody"); st.innerHTML="";
+  for(const [nome,dec] of [["Equinozi",0],["Solstizio estate",eps],["Solstizio inverno",-eps]]){
+    const rs=riseSet(dec,lat,h0);
+    st.insertAdjacentHTML("beforeend","<tr><td>"+nome+" (\u03b5="+eps.toFixed(3)+"\u00b0)</td>"+
+     (rs?"<td class='num'>"+rs[0].toFixed(2)+"\u00b0</td><td class='num'>"+rs[1].toFixed(2)+"\u00b0</td>":"<td colspan='2' class='never'>&mdash;</td>")+"</tr>");
+  }
+  drawSky(pos,lst,lat,scene);
+}
+function drawSky(pos,lst,lat,scene){
+  const cv=document.getElementById('sky'),g=cv.getContext('2d');
+  const W=cv.width,Hh=cv.height;
+  g.fillStyle="#160A0D"; g.fillRect(0,0,W,Hh);
+  const az0=50,az1=210,altMin=-14,altMax=60;
+  const X=a=>(a-az0)/(az1-az0)*W, Y=h=>Hh-(h-altMin)/(altMax-altMin)*Hh;
+  g.fillStyle="#2A1216"; g.fillRect(0,Y(0),W,Hh-Y(0));
+  g.strokeStyle="#D4A94A"; g.lineWidth=1.4;
+  g.beginPath(); g.moveTo(0,Y(0)); g.lineTo(W,Y(0)); g.stroke();
+  g.font="12px Georgia"; g.fillStyle="#EAD9A8"; g.textAlign="center";
+  for(const [a,l] of [[60,"ENE"],[90,"EST"],[120,"ESE"],[135,"SE"],[150,"SSE"],[180,"SUD"],[200,"SSO"]])
+    g.fillText(l,X(a),Y(0)+16);
+  g.strokeStyle="rgba(212,169,74,.25)";
+  for(let h=10;h<=50;h+=10){g.beginPath();g.moveTo(0,Y(h));g.lineTo(W,Y(h));g.stroke();
+    g.fillStyle="rgba(212,169,74,.7)";g.textAlign="left";g.fillText(h+"\u00b0",4,Y(h)-2);g.textAlign="center";}
+  if(scene==="dawn"){ // sole all'orizzonte est
+    g.fillStyle="#F2C14E"; g.beginPath(); g.arc(X(90),Y(0),11,0,7); g.fill();
+    g.fillStyle="#FFE9B0"; g.fillText("SOLE",X(90),Y(0)-16);
+  }
+  const lines=[["Betelgeuse","Bellatrix"],["Bellatrix","Mintaka"],["Mintaka","Alnilam"],["Alnilam","Alnitak"],
+   ["Alnitak","Saiph"],["Saiph","Rigel"],["Rigel","Mintaka"],["Betelgeuse","Alnitak"],
+   ["Regolo","Denebola"],["Regolo","Algieba"]];
+  g.strokeStyle="rgba(212,169,74,.45)";
+  for(const [a,b] of lines){ if(!pos[a]||!pos[b]) continue;
+    const A=altaz(...pos[a],lst,lat),B=altaz(...pos[b],lst,lat);
+    if(A[1]>az0&&A[1]<az1&&B[1]>az0&&B[1]<az1){g.beginPath();g.moveTo(X(A[1]),Y(A[0]));g.lineTo(X(B[1]),Y(B[0]));g.stroke();}}
+  for(const n in pos){
+    const [alt,az]=altaz(...pos[n],lst,lat);
+    if(az<az0||az>az1||alt<altMin+2) continue;
+    const r= n==="Sirio"?7 : 4.5;
+    if(alt>=0){ g.fillStyle="#EAD9A8"; g.beginPath(); g.arc(X(az),Y(alt),r,0,7); g.fill(); }
+    else { g.strokeStyle="#D4A94A"; g.lineWidth=1.4; g.beginPath(); g.arc(X(az),Y(alt),r,0,7); g.stroke(); }
+    g.fillStyle= alt>=0 ? "#EAD9A8" : "#D4A94A";
+    g.fillText(n+(alt<0?" (sotto)":""),X(az),Y(alt)-10);
+  }
+}
+run();
+</script>
+</body>
+</html>
