@@ -1,0 +1,22 @@
+{
+  "name": "Precessio",
+  "short_name": "Precessio",
+  "description": "Motore archeoastronomico - modello Vondrak-Capitaine-Wallace, moto proprio 3D",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#160A0D",
+  "theme_color": "#6B1F2A",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
