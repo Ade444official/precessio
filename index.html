@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2218%22 fill=%22%236B1F2A%22/><text x=%2250%22 y=%2268%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22%23D4A94A%22>&%239733;</text></svg>">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -16,9 +15,13 @@
   .sub { text-align:center; color:var(--gold); font-style:italic; margin:2px 0 16px; font-size:14px; }
   .wrap { max-width:1000px; margin:0 auto; }
   .panel { background:var(--panel); border:2px solid var(--bord); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+  h2 { color:var(--gold); font-size:16px; letter-spacing:1px; margin:2px 0 10px; font-weight:normal; }
   label { color:var(--gold); font-size:13px; display:block; margin-bottom:3px; }
   select,input { background:#1d0d10; color:var(--goldl); border:1px solid var(--bord); border-radius:4px; padding:6px 8px; font-family:inherit; font-size:14px; width:100%; box-sizing:border-box; }
+  input[type=range]{ padding:0; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .btn { background:var(--bord); color:#fff; cursor:pointer; font-size:15px; letter-spacing:2px; border:1px solid var(--gold); }
+  .btn2 { background:#1d0d10; color:var(--gold); cursor:pointer; font-size:13px; letter-spacing:1px; border:1px solid var(--bord); }
   table { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
   th { background:var(--bord); color:#fff; padding:5px 8px; text-align:left; font-weight:normal; }
   td { padding:5px 8px; border-bottom:1px solid #3a1a20; }
@@ -27,6 +30,7 @@
   canvas { width:100%; background:var(--bg); border:2px solid var(--bord); border-radius:6px; display:block; }
   .foot { text-align:center; color:var(--gold); font-size:11.5px; margin-top:10px; }
   .epoca { color:var(--goldl); font-size:20px; text-align:center; margin:6px 0 2px; }
+  #lstbox { display:none; }
 </style>
 </head>
 <body>
@@ -39,7 +43,11 @@
       <div><label>Sito</label>
         <select id="site" onchange="siteChanged()">
           <option value="29.9792,31.1342">Giza (Grande Piramide)</option>
+          <option value="29.97528,31.13757">Giza (Grande Sfinge)</option>
+          <option value="29.98334,31.12906">Giza (collinetta seconda Sfinge)</option>
           <option value="37.2231,38.9225">G&ouml;bekli Tepe</option>
+          <option value="37.0966,39.3007">Karahan Tepe</option>
+          <option value="22.5083,30.7256">Nabta Playa</option>
           <option value="51.1789,-1.8262">Stonehenge</option>
           <option value="-16.5544,-68.6733">Tiwanaku</option>
           <option value="-9.9,-67.8">Acre (geoglifi)</option>
@@ -49,11 +57,16 @@
       <div><label>Anno (negativo = a.C. astron.; 9999 a.C. = -9998)</label><input id="year" type="number" step="10" value="-12099"></div>
       <div><label>Altezza orizzonte h&#8320; (&deg;)</label><input id="h0" type="number" step="0.1" value="0"></div>
       <div><label>Scena del cielo</label>
-        <select id="scene">
+        <select id="scene" onchange="sceneChanged()">
           <option value="dawn">Alba equinozio di primavera</option>
           <option value="culm">Culminazione di Alnilam (Cintura)</option>
+          <option value="free">Ruota il cielo (orologio siderale)</option>
         </select></div>
-      <div style="display:flex;align-items:flex-end"><input type="button" value="CALCOLA" onclick="run()" style="background:var(--bord);color:#fff;cursor:pointer;font-size:15px;letter-spacing:2px"></div>
+      <div style="display:flex;align-items:flex-end"><input type="button" class="btn" value="CALCOLA" onclick="run()"></div>
+    </div>
+    <div id="lstbox" style="margin-top:10px">
+      <label>Tempo siderale locale: <span id="lstval">270&deg;</span> — trascina per far ruotare il cielo</label>
+      <input type="range" id="lst" min="0" max="360" step="1" value="270" oninput="run()">
     </div>
   </div>
 
@@ -63,10 +76,28 @@
       <th>Stella</th><th>Dec di data</th><th>Az levata</th><th>Az tramonto</th><th>h culminazione</th><th>Nella scena: az / h</th>
     </tr></thead><tbody></tbody></table>
     <table id="sun"><thead><tr><th>Sole</th><th>Az levata</th><th>Az tramonto</th></tr></thead><tbody></tbody></table>
+    <div style="margin-top:10px; display:flex; gap:10px;">
+      <input type="button" class="btn2" value="&#8681; ESPORTA TABELLA (CSV per QGIS/Excel)" onclick="exportCSV()">
+      <span id="pole" style="color:var(--gold); font-size:13px; align-self:center;"></span>
+    </div>
   </div>
 
   <div class="panel"><canvas id="sky" width="1000" height="430"></canvas></div>
-  <div class="foot">Precessio v0.1 &middot; coefficienti identici a Stellarium (Vondr&aacute;k et al., A&amp;A 534, A22) &middot; laboratorio ADE 444 &middot; risultati riproducibili</div>
+
+  <div class="panel">
+    <h2>&#9878; RICERCA INVERSA — in quale epoca questa stella sorgeva/tramontava a questo azimut?</h2>
+    <div class="grid">
+      <div><label>Stella</label><select id="qstar"></select></div>
+      <div><label>Evento</label><select id="qev"><option value="rise">Levata</option><option value="set">Tramonto</option></select></div>
+      <div><label>Azimut bersaglio (&deg;)</label><input id="qaz" type="number" step="0.1" value="172"></div>
+      <div><label>Da anno</label><input id="qy1" type="number" value="-15000"></div>
+      <div><label>A anno</label><input id="qy2" type="number" value="2000"></div>
+      <div style="display:flex;align-items:flex-end"><input type="button" class="btn" value="CERCA EPOCHE" onclick="inverse()"></div>
+    </div>
+    <div id="qout" style="margin-top:10px; font-size:14px;"></div>
+  </div>
+
+  <div class="foot">Precessio v0.2 &middot; coefficienti identici a Stellarium (Vondr&aacute;k et al., A&amp;A 534, A22) &middot; laboratorio ADE 444 &middot; risultati riproducibili</div>
 </div>
 
 <script>
@@ -141,15 +172,24 @@ const CAT = [
  ["Regolo",152.09296,11.96721,-249.40,4.91,1.36,41.13,5.9],
  ["Denebola",177.26491,14.57206,-497.68,-114.67,2.14,90.91,-0.2],
  ["Aldebaran",68.98016,16.50930,62.78,-189.36,0.87,48.94,54.3],
+ ["Alcyone (Pleiadi)",56.87117,24.10514,19.35,-43.11,2.87,0,0],
  ["Canopo",95.98796,-52.69566,19.93,23.24,-0.72,0,0],
  ["Capella",79.17232,45.99799,75.52,-427.11,0.08,76.20,29.9],
  ["Deneb",310.35798,45.28034,1.99,1.95,1.25,0,0],
  ["Vega",279.23473,38.78369,200.94,286.23,0.03,130.23,-13.9],
  ["Spica",201.29824,-11.16132,-42.35,-30.67,0.97,0,0],
- ["Antares",247.35192,-26.43200,-12.11,-23.30,1.06,0,0]];
+ ["Antares",247.35192,-26.43200,-12.11,-23.30,1.06,0,0],
+ ["Arturo",213.91530,19.18241,-1093.45,-1999.40,-0.05,88.83,-5.2],
+ ["Fomalhaut",344.41269,-29.62224,328.95,-164.67,1.16,129.81,6.5],
+ ["Thuban",211.09729,64.37585,-56.52,17.19,3.65,0,0],
+ ["Kochab",222.67636,74.15550,-32.61,11.42,2.08,0,0],
+ ["Polaris",37.95456,89.26411,44.48,-11.85,1.98,0,0],
+ ["Acrux (Croce Sud)",186.64956,-63.09909,-35.83,-14.86,0.76,0,0],
+ ["Mimosa (Croce Sud)",191.93029,-59.68877,-48.24,-12.82,1.25,0,0],
+ ["Achernar",24.42852,-57.23675,87.00,-38.24,0.46,0,0]];
 
 function starOfDate(s, year){
-  const [_,ra,dec,pmra,pmdec,mag,plx,rv]=[0,...s.slice(1)];
+  const ra=s[1],dec=s[2],pmra=s[3],pmdec=s[4],plx=s[6],rv=s[7];
   let raE, decE;
   if(plx>0){
     const d=1000/plx, rr=vec(ra,dec), rar=ra*D2R, der=dec*D2R;
@@ -182,9 +222,16 @@ function riseSet(dec,lat,h0){
 function fmt(x,dp=2){return (x>=0?"+":"")+x.toFixed(dp)+"\u00b0";}
 function bc(y){return y<=0 ? (1-y).toLocaleString('it')+" a.C." : y+" d.C.";}
 
+let lastRows=[]; // per l'export CSV
+
 function siteChanged(){
   const v=document.getElementById('site').value;
   if(v!=="custom"){document.getElementById('lat').value=v.split(",")[0];}
+}
+function sceneChanged(){
+  document.getElementById('lstbox').style.display =
+    document.getElementById('scene').value==="free" ? "block" : "none";
+  run();
 }
 function run(){
   const lat=parseFloat(document.getElementById('lat').value);
@@ -193,31 +240,79 @@ function run(){
   const scene=document.getElementById('scene').value;
   const T=(year-2000)/100;
   document.getElementById('epoca').textContent="Cielo del "+bc(year)+" \u00b7 lat "+lat.toFixed(4)+"\u00b0";
-  // stelle
   const pos={}; for(const s of CAT) pos[s[0]]=starOfDate(s,year);
-  let lst = scene==="dawn" ? 270 : pos["Alnilam"][0];
+  let lst;
+  if(scene==="dawn") lst=270;
+  else if(scene==="culm") lst=pos["Alnilam"][0];
+  else { lst=parseFloat(document.getElementById('lst').value);
+         document.getElementById('lstval').textContent=lst.toFixed(0)+"\u00b0"; }
   const tb=document.querySelector("#tab tbody"); tb.innerHTML="";
+  lastRows=[["Stella","Dec_data","Az_levata","Az_tramonto","h_culminazione","Az_scena","h_scena"]];
+  let bestPole=null;
   for(const s of CAT){
     const [ra,dec]=pos[s[0]];
     const rs=riseSet(dec,lat,h0);
     const [alt,az]=altaz(ra,dec,lst,lat);
-    const hc=90-Math.abs(lat-dec)<90 ? 90-lat+dec : null;
     const hcv = (lat>=0? 90-lat+dec : 90+lat-dec);
+    const pd = 90-Math.abs(dec);
+    if(bestPole===null||pd<bestPole[1]) bestPole=[s[0],pd];
     tb.insertAdjacentHTML("beforeend",
       "<tr><td>"+s[0]+"</td><td class='num'>"+fmt(dec)+"</td>"+
       (rs? "<td class='num'>"+rs[0].toFixed(1)+"\u00b0</td><td class='num'>"+rs[1].toFixed(1)+"\u00b0</td>"
          : "<td colspan='2' class='never'>"+(Math.sign(dec)===Math.sign(lat)&&Math.abs(dec)>90-Math.abs(lat)?"circumpolare":"mai sopra l'orizzonte")+"</td>")+
       "<td class='num'>"+fmt(hcv,1)+"</td><td class='num'>"+az.toFixed(1)+"\u00b0 / "+fmt(alt,1)+"</td></tr>");
+    lastRows.push([s[0],dec.toFixed(3), rs?rs[0].toFixed(2):"", rs?rs[1].toFixed(2):"", hcv.toFixed(2), az.toFixed(2), alt.toFixed(2)]);
   }
-  // sole: equinozio e solstizi (obliquita' dell'epoca)
+  document.getElementById('pole').textContent =
+    "\u2605 Stella pi\u00f9 vicina al polo in quest'epoca: "+bestPole[0]+" (a "+bestPole[1].toFixed(1)+"\u00b0 dal polo)";
   const eps=angles(T)[3]*R2D;
   const st=document.querySelector("#sun tbody"); st.innerHTML="";
   for(const [nome,dec] of [["Equinozi",0],["Solstizio estate",eps],["Solstizio inverno",-eps]]){
     const rs=riseSet(dec,lat,h0);
     st.insertAdjacentHTML("beforeend","<tr><td>"+nome+" (\u03b5="+eps.toFixed(3)+"\u00b0)</td>"+
      (rs?"<td class='num'>"+rs[0].toFixed(2)+"\u00b0</td><td class='num'>"+rs[1].toFixed(2)+"\u00b0</td>":"<td colspan='2' class='never'>&mdash;</td>")+"</tr>");
+    lastRows.push(["SOLE "+nome, dec===0?"0":dec.toFixed(3), rs?rs[0].toFixed(2):"", rs?rs[1].toFixed(2):"", "", "", ""]);
   }
   drawSky(pos,lst,lat,scene);
+}
+function exportCSV(){
+  const year=document.getElementById('year').value, lat=document.getElementById('lat').value;
+  let csv="Precessio v0.2;anno="+year+";lat="+lat+"\n";
+  for(const r of lastRows) csv+=r.join(";")+"\n";
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download="precessio_"+year+".csv"; a.click();
+}
+function inverse(){
+  const lat=parseFloat(document.getElementById('lat').value);
+  const h0=parseFloat(document.getElementById('h0').value);
+  const name=document.getElementById('qstar').value;
+  const ev=document.getElementById('qev').value;
+  const target=parseFloat(document.getElementById('qaz').value);
+  let y1=parseFloat(document.getElementById('qy1').value), y2=parseFloat(document.getElementById('qy2').value);
+  if(y1>y2){const t=y1;y1=y2;y2=t;}
+  const s=CAT.find(x=>x[0]===name);
+  const out=document.getElementById('qout');
+  const f=(y)=>{ const [,dec]=starOfDate(s,y); const rs=riseSet(dec,lat,h0);
+                 return rs? (ev==="rise"?rs[0]:rs[1]) - target : null; };
+  let res=[], prev=null, step=25;
+  for(let y=y1;y<=y2;y+=step){
+    const v=f(y);
+    if(prev!==null && v!==null && prev[1]!==null && prev[1]*v<=0){
+      // raffina per bisezione
+      let a=prev[0],b=y;
+      for(let i=0;i<20;i++){const m=(a+b)/2; const vm=f(m);
+        if(vm===null)break; if(f(a)*vm<=0)b=m;else a=m;}
+      res.push((a+b)/2);
+    }
+    prev=[y,v];
+  }
+  if(res.length===0){
+    out.innerHTML="<span class='never'>Nessuna epoca trovata nell'intervallo: la stella non raggiunge mai l'azimut "+target+"\u00b0 (o non sorge affatto) a questa latitudine.</span>";
+  } else {
+    out.innerHTML = "<b>"+name+"</b> "+(ev==="rise"?"sorgeva":"tramontava")+" ad azimut "+target+"\u00b0 (h\u2080="+h0+"\u00b0, lat "+lat.toFixed(3)+"\u00b0) in queste epoche:<br>"+
+      res.map(y=>"&#9733; <b>"+bc(Math.round(y))+"</b>").join(" &nbsp;&middot;&nbsp; ");
+  }
 }
 function drawSky(pos,lst,lat,scene){
   const cv=document.getElementById('sky'),g=cv.getContext('2d');
@@ -234,13 +329,13 @@ function drawSky(pos,lst,lat,scene){
   g.strokeStyle="rgba(212,169,74,.25)";
   for(let h=10;h<=50;h+=10){g.beginPath();g.moveTo(0,Y(h));g.lineTo(W,Y(h));g.stroke();
     g.fillStyle="rgba(212,169,74,.7)";g.textAlign="left";g.fillText(h+"\u00b0",4,Y(h)-2);g.textAlign="center";}
-  if(scene==="dawn"){ // sole all'orizzonte est
+  if(scene==="dawn"){
     g.fillStyle="#F2C14E"; g.beginPath(); g.arc(X(90),Y(0),11,0,7); g.fill();
     g.fillStyle="#FFE9B0"; g.fillText("SOLE",X(90),Y(0)-16);
   }
   const lines=[["Betelgeuse","Bellatrix"],["Bellatrix","Mintaka"],["Mintaka","Alnilam"],["Alnilam","Alnitak"],
    ["Alnitak","Saiph"],["Saiph","Rigel"],["Rigel","Mintaka"],["Betelgeuse","Alnitak"],
-   ["Regolo","Denebola"],["Regolo","Algieba"]];
+   ["Regolo","Denebola"],["Acrux (Croce Sud)","Mimosa (Croce Sud)"]];
   g.strokeStyle="rgba(212,169,74,.45)";
   for(const [a,b] of lines){ if(!pos[a]||!pos[b]) continue;
     const A=altaz(...pos[a],lst,lat),B=altaz(...pos[b],lst,lat);
@@ -255,6 +350,10 @@ function drawSky(pos,lst,lat,scene){
     g.fillText(n+(alt<0?" (sotto)":""),X(az),Y(alt)-10);
   }
 }
+// popola il selettore stelle della ricerca inversa
+const qs=document.getElementById('qstar');
+for(const s of CAT){const o=document.createElement('option');o.textContent=s[0];qs.appendChild(o);}
+qs.value="Sirio";
 run();
 </script>
 </body>
