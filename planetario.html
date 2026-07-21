@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Precessio 3D — il Nastro del tempo profondo</title>
+<style>
+  :root { --bord:#6B1F2A; --gold:#D4A94A; --goldl:#EAD9A8; --bg:#0b0507; }
+  html,body { margin:0; height:100%; background:var(--bg); overflow:hidden; font-family:Georgia,serif; }
+  #bar { position:fixed; top:0; left:0; right:0; z-index:10; background:rgba(22,10,13,.92);
+         border-bottom:2px solid var(--bord); padding:8px 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+  #bar label { color:var(--gold); font-size:11px; display:block; }
+  #bar select,#bar input { background:#1d0d10; color:var(--goldl); border:1px solid var(--bord);
+         border-radius:4px; padding:4px 6px; font-family:inherit; font-size:13px; }
+  .btn { background:var(--bord); color:#fff; cursor:pointer; letter-spacing:1px; border:1px solid var(--gold); }
+  #title { color:var(--goldl); letter-spacing:3px; font-size:18px; align-self:center; margin-right:8px; }
+  #nastro { position:fixed; bottom:0; left:0; right:0; z-index:12; background:rgba(22,10,13,.92);
+         border-top:2px solid var(--bord); padding:8px 14px; display:flex; gap:10px; align-items:center; }
+  #tline { flex:1; }
+  #epoch { position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:9;
+         color:var(--goldl); font-size:26px; letter-spacing:2px; text-shadow:0 0 8px #000;
+         background:rgba(22,10,13,.55); padding:2px 18px; border-radius:8px; }
+  #pole { position:fixed; top:108px; left:50%; transform:translateX(-50%); z-index:9;
+         color:var(--gold); font-size:13px; background:rgba(22,10,13,.55); padding:2px 12px; border-radius:8px; }
+  #info { position:fixed; bottom:58px; left:12px; z-index:10; color:var(--gold); font-size:12px;
+          background:rgba(22,10,13,.7); padding:4px 10px; border-radius:6px; }
+  #vrbtn { position:fixed; bottom:8px; right:12px; z-index:10; display:none; padding:8px 14px; }
+  a { color:var(--gold); }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span id="title">P R E C E S S I O &nbsp;3D &middot; IL NASTRO</span>
+  <div><label>Sito (punto di osservazione)</label>
+    <select id="site">
+      <option value="37.2231,38.9225">G&ouml;bekli Tepe</option>
+      <option value="-16.5544,-68.6733">Tiwanaku</option>
+      <option value="-9.9,-67.8">Acre (geoglifi)</option>
+    </select></div>
+  <div><label>Scena</label>
+    <select id="scene">
+      <option value="dawn">Alba equinozio</option>
+      <option value="culm">Culminazione Cintura</option>
+      <option value="free">Orologio siderale</option>
+    </select></div>
+  <div id="lstbox" style="display:none"><label>Tempo siderale: <span id="lstval">270&deg;</span></label>
+    <input id="lst" type="range" min="0" max="360" value="270" style="width:130px"></div>
+</div>
+<div id="epoch"></div>
+<div id="pole"></div>
+<div id="nastro">
+  <input type="button" class="btn" value="&#9194;&#9194;" title="indietro veloce" onclick="play(-1)">
+  <input type="button" class="btn" value="&#9194;" title="indietro lento" onclick="play(-0.12)">
+  <input type="button" class="btn" value="&#9208;" onclick="play(0)">
+  <input type="button" class="btn" value="&#9193;" title="avanti lento" onclick="play(0.12)">
+  <input type="button" class="btn" value="&#9193;&#9193;" title="avanti veloce" onclick="play(1)">
+  <input id="tline" type="range" min="-100000" max="100000" step="10" value="-12099">
+  <input id="year" type="number" step="50" value="-12099" style="width:90px">
+</div>
+<div id="info">Trascina per guardarti intorno &middot; cielo calcolato: modello Vondr&aacute;k + moto proprio 3D &middot; <span id="cred"></span> <a href="index.html">&larr; torna a Precessio</a></div>
+<input type="button" id="vrbtn" class="btn" value="ENTRA IN VR" onclick="enterVR()" style="bottom:60px">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="catalogo.js"></script>
+<script>
+// ============ MOTORE (identico a Precessio v0.2) ============
+const AS2R=Math.PI/(180*3600), EPS0=84381.406*AS2R, D2R=Math.PI/180, R2D=180/Math.PI;
+const precVals=[[1/402.90,-22206.325946,1267.727824,-13765.924050,-3243.236469,-8571.476251,-2206.967126],
+[1/256.75,12236.649447,1702.324248,13511.858383,-3969.723769,5309.796459,-4186.752711],
+[1/292.00,-1589.008343,-2970.553839,-1455.229106,7099.207893,-610.393953,6737.949677],
+[1/537.22,2482.103195,693.790312,1054.394467,-1903.696711,923.201931,-856.922846],
+[1/241.45,150.322920,-14.724451,0,146.435014,3.759055,0],
+[1/375.22,-13.632066,-516.649401,-112.300144,1300.630106,-40.691114,957.149088],
+[1/157.87,389.437420,-356.794454,202.769908,1727.498039,80.437484,1709.440735],
+[1/274.20,2031.433792,-129.552058,1936.050095,299.854055,807.300668,154.425505],
+[1/203.00,363.748303,256.129314,0,-1217.125982,83.712326,0],
+[1/440.00,-896.747562,190.266114,-655.484214,-471.367487,-368.654854,-243.520976],
+[1/170.72,-926.995700,95.103991,-891.898637,-441.682145,-191.881064,-406.539008],
+[1/713.37,37.070667,-332.907067,0,-86.169171,-4.263770,0],
+[1/313.00,-597.682468,131.337633,0,-308.320429,-270.353691,0],
+[1/128.38,66.282812,82.731919,-333.322021,-422.815629,11.602861,-446.656435],
+[1/202.00,0,0,327.517465,0,0,-1049.071786],
+[1/315.00,0,0,-494.780332,0,0,-301.504189],
+[1/136.32,0,0,585.492621,0,0,41.348740],
+[1/490.00,0,0,110.512834,0,0,142.525186]];
+const pEps=[[1/409.90,-6908.287473,753.872780,-2845.175469,-1704.720302],
+[1/396.15,-3198.706291,-247.805823,449.844989,-862.308358],
+[1/537.22,1453.674527,379.471484,-1255.915323,447.832178],
+[1/402.90,-857.748557,-53.880558,886.736783,-889.571909],
+[1/417.15,1173.231614,-90.109153,418.887514,190.402846],
+[1/288.92,-156.981465,-353.600190,997.912441,-56.564991],
+[1/4043.0,371.836550,-63.115353,-240.979710,-296.222622],
+[1/306.00,-216.619040,-28.248187,76.541307,-75.859952],
+[1/277.00,193.691479,17.703387,-36.788069,67.473503],
+[1/203.00,11.891524,38.911307,-170.964086,3.014055]];
+function angles(T){const T2pi=T*2*Math.PI;let psi=0,ome=0,chi=0,eps=0;
+ for(const r of precVals){const p=T2pi*r[0],c=Math.cos(p),s=Math.sin(p);
+  psi+=r[1]*c+r[4]*s;ome+=r[2]*c+r[5]*s;chi+=r[3]*c+r[6]*s;}
+ for(const r of pEps){const p=T2pi*r[0],c=Math.cos(p),s=Math.sin(p);eps+=r[2]*c+r[4]*s;}
+ psi+=((289e-9*T-0.00740913)*T+5042.7980307)*T+8473.343527;
+ ome+=((151e-9*T+0.00000146)*T-0.4436568)*T+84283.175915;
+ chi+=((-61e-9*T+0.00001472)*T+0.0790159)*T-19.657270;
+ eps+=((-110e-9*T-0.00004039)*T+0.3624445)*T+84028.206305;
+ return [psi*AS2R,ome*AS2R,chi*AS2R,eps*AS2R];}
+function R1(a){const c=Math.cos(a),s=Math.sin(a);return [[1,0,0],[0,c,s],[0,-s,c]];}
+function R3(a){const c=Math.cos(a),s=Math.sin(a);return [[c,s,0],[-s,c,0],[0,0,1]];}
+function mm(A,B){const M=[[0,0,0],[0,0,0],[0,0,0]];
+ for(let i=0;i<3;i++)for(let j=0;j<3;j++)for(let k=0;k<3;k++)M[i][j]+=A[i][k]*B[k][j];return M;}
+function mv(A,v){return [A[0][0]*v[0]+A[0][1]*v[1]+A[0][2]*v[2],
+ A[1][0]*v[0]+A[1][1]*v[1]+A[1][2]*v[2],A[2][0]*v[0]+A[2][1]*v[1]+A[2][2]*v[2]];}
+function precMatrix(T){const [psi,ome,chi]=angles(T);
+ return mm(R3(chi),mm(R1(-ome),mm(R3(-psi),R1(EPS0))));}
+function vec(ra,dec){const r=ra*D2R,d=dec*D2R;
+ return [Math.cos(d)*Math.cos(r),Math.cos(d)*Math.sin(r),Math.sin(d)];}
+function radec(v){const n=Math.hypot(v[0],v[1],v[2]);
+ return [((Math.atan2(v[1],v[0])*R2D)+360)%360,Math.asin(v[2]/n)*R2D];}
+const CAT=[["Alnitak",85.18969,-1.94257,3.19,2.03,1.77,0,0],
+["Alnilam",84.05339,-1.20192,1.49,-1.06,1.69,0,0],
+["Mintaka",83.00167,-0.29910,0.64,-0.69,2.23,0,0],
+["Betelgeuse",88.79294,7.40706,27.54,11.30,0.45,0,0],
+["Rigel",78.63446,-8.20164,1.31,0.50,0.13,0,0],
+["Bellatrix",81.28276,6.34970,-8.11,-12.88,1.64,0,0],
+["Saiph",86.93912,-9.66960,1.55,-1.20,2.07,0,0],
+["Sirio",101.28716,-16.71612,-546.01,-1223.07,-1.46,379.21,-5.5],
+["Procione",114.82550,5.22499,-714.59,-1036.80,0.37,284.56,-3.2],
+["Regolo",152.09296,11.96721,-249.40,4.91,1.36,41.13,5.9],
+["Denebola",177.26491,14.57206,-497.68,-114.67,2.14,90.91,-0.2],
+["Aldebaran",68.98016,16.50930,62.78,-189.36,0.87,48.94,54.3],
+["Alcyone (Pleiadi)",56.87117,24.10514,19.35,-43.11,2.87,0,0],
+["Canopo",95.98796,-52.69566,19.93,23.24,-0.72,0,0],
+["Capella",79.17232,45.99799,75.52,-427.11,0.08,76.20,29.9],
+["Deneb",310.35798,45.28034,1.99,1.95,1.25,0,0],
+["Vega",279.23473,38.78369,200.94,286.23,0.03,130.23,-13.9],
+["Spica",201.29824,-11.16132,-42.35,-30.67,0.97,0,0],
+["Antares",247.35192,-26.43200,-12.11,-23.30,1.06,0,0],
+["Arturo",213.91530,19.18241,-1093.45,-1999.40,-0.05,88.83,-5.2],
+["Fomalhaut",344.41269,-29.62224,328.95,-164.67,1.16,129.81,6.5],
+["Thuban",211.09729,64.37585,-56.52,17.19,3.65,0,0],
+["Kochab",222.67636,74.15550,-32.61,11.42,2.08,0,0],
+["Polaris",37.95456,89.26411,44.48,-11.85,1.98,0,0],
+["Acrux (Croce Sud)",186.64956,-63.09909,-35.83,-14.86,0.76,0,0],
+["Mimosa (Croce Sud)",191.93029,-59.68877,-48.24,-12.82,1.25,0,0],
+["Achernar",24.42852,-57.23675,87.00,-38.24,0.46,0,0]];
+function starOfDate(s,year){
+ const ra=s[1],dec=s[2],pmra=s[3],pmdec=s[4],plx=s[6],rv=s[7];let raE,decE;
+ if(plx>0){const d=1000/plx,rr=vec(ra,dec),rar=ra*D2R,der=dec*D2R;
+  const p=[-Math.sin(rar),Math.cos(rar),0];
+  const q=[-Math.sin(der)*Math.cos(rar),-Math.sin(der)*Math.sin(rar),Math.cos(der)];
+  const k=AS2R/1000,dt=year-2000;
+  const vt=[(pmra*k*p[0]+pmdec*k*q[0])*d,(pmra*k*p[1]+pmdec*k*q[1])*d,(pmra*k*p[2]+pmdec*k*q[2])*d];
+  const vr=rv*1.0227e-6;
+  const pos=[rr[0]*d+(vt[0]+vr*rr[0])*dt,rr[1]*d+(vt[1]+vr*rr[1])*dt,rr[2]*d+(vt[2]+vr*rr[2])*dt];
+  [raE,decE]=radec(pos);
+ } else {const dt=year-2000;decE=dec+pmdec*dt/3.6e6;raE=ra+(pmra/Math.cos(dec*D2R))*dt/3.6e6;}
+ const T=(year-2000)/100;return radec(mv(precMatrix(T),vec(raE,decE)));}
+function altaz(ra,dec,lst,lat){
+ const H=(lst-ra)*D2R,d=dec*D2R,p=lat*D2R;
+ const alt=Math.asin(Math.sin(p)*Math.sin(d)+Math.cos(p)*Math.cos(d)*Math.cos(H));
+ const A=Math.atan2(-Math.cos(d)*Math.sin(H),Math.sin(d)*Math.cos(p)-Math.cos(d)*Math.sin(p)*Math.cos(H));
+ return [alt*R2D,((A*R2D)+360)%360];}
+
+// ============ SCENA 3D — OGGETTI PERSISTENTI + NASTRO ============
+const R=1800;
+let scene,camera,renderer,groundGroup,yaw=150,pitch=12;
+let stars={},lines=[],sun,playDir=0,playCur=0;
+let rig,controllers=[],vrHud=null,poleTxt='';
+let dawnGlow=null,sunGlow=null,glowTex=null;
+let monuments=[],groundId=0,terrainSampler=null;
+// ============ TERRENO REALE — DEM SRTM + foto aerea ============
+function ll2tile(lat,lon,z){const n=Math.pow(2,z);
+ const x=(lon+180)/360*n;
+ const la=lat*D2R;
+ const y=(1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n;
+ return [x,y];}
+function loadTile(url,raw){
+ if(raw&&self.createImageBitmap){ // DEM: niente gestione colore, i byte devono restare intatti
+  return fetch(url,{mode:'cors'}).then(r=>r.blob())
+   .then(b=>createImageBitmap(b,{colorSpaceConversion:'none',premultiplyAlpha:'none'}));}
+ return new Promise((res,rej)=>{
+  const im=new Image();im.crossOrigin='anonymous';
+  im.onload=()=>res(im);im.onerror=rej;im.src=url;});}
+async function fetchGrid(z,cnt,urlFn,lat,lon,raw){
+ const [tx,ty]=ll2tile(lat,lon,z);
+ const cx=Math.floor(tx),cy=Math.floor(ty),h=(cnt-1)/2;
+ const cv=document.createElement('canvas');cv.width=cv.height=cnt*256;
+ const g=cv.getContext('2d');
+ const jobs=[];
+ for(let dx=-h;dx<=h;dx++)for(let dy=-h;dy<=h;dy++)
+  jobs.push(loadTile(urlFn(z,cx+dx,cy+dy),raw).then(im=>g.drawImage(im,(dx+h)*256,(dy+h)*256)));
+ await Promise.all(jobs);
+ return {cv,g,px0:(cx-h)*256,py0:(cy-h)*256,size:cnt*256};}
+const USA_DEM=new URLSearchParams(location.search).get('dem')==='1';
+async function buildTerrain(lat,lon,my,mlat,mlon){
+ try{
+  if(!USA_DEM){ // piana in piano: solo foto aerea drappeggiata (rilievo disattivato)
+   terrainSampler=()=>0;
+   await buildDrape(lat,lon,my,mlat,mlon,'terreno: piano (rilievo disattivato \u2014 aggiungi ?dem=1 per provarlo)');
+   return;}
+  const Zt=14;
+  const elev=await fetchGrid(Zt,3,(z,x,y)=>
+   'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/'+z+'/'+x+'/'+y+'.png',lat,lon,true);
+  if(my!==groundId)return;
+  const data=elev.g.getImageData(0,0,elev.size,elev.size,{colorSpace:'srgb'}).data,ES=elev.size;
+  const hRaw=(la,lo)=>{const t=ll2tile(la,lo,Zt);
+   let px=Math.round(t[0]*256-elev.px0),py=Math.round(t[1]*256-elev.py0);
+   px=Math.max(0,Math.min(ES-1,px));py=Math.max(0,Math.min(ES-1,py));
+   const i=(py*ES+px)*4;
+   if(data[i+3]===0)return null;               // pixel trasparente = dato mancante
+   const v=data[i]*256+data[i+1]+data[i+2]/256-32768;
+   return (isFinite(v)&&v>-500&&v<9000)?v:null;}; // fuori range = dato non valido
+  const h0=hRaw(lat,lon);
+  if(h0===null)return;                          // niente quota al sito: si resta sulla sabbia
+  // controllo di plausibilita': dislivello su 2 km entro limiti ragionevoli
+  let mn=1e9,mx=-1e9,bad=0,tot=0;
+  for(let a=-1000;a<=1000;a+=100)for(let b=-1000;b<=1000;b+=100){
+   const v=hRaw(lat+b/mlat,lon+a/mlon);tot++;
+   if(v===null){bad++;continue;}
+   if(v<mn)mn=v;if(v>mx)mx=v;}
+  const dislivello=mx-mn;
+  const demOK=(bad/tot<0.2)&&isFinite(dislivello)&&dislivello<400;
+  if(!demOK){ // rilievo inaffidabile: terreno piatto, ma foto aerea e monumenti restano
+   terrainSampler=()=>0;
+   console.warn('Rilievo scartato (dislivello '+Math.round(dislivello)+' m, '+bad+'/'+tot+' letture nulle): terreno reso piano.');
+  }else{
+   terrainSampler=(e,n)=>{const v=hRaw(lat+n/mlat,lon+e/mlon);
+    return v===null?0:v-h0;};}
+  const SIZE=2600,SEG=128;
+  const g=new THREE.PlaneGeometry(SIZE,SIZE,SEG,SEG);
+  g.rotateX(-Math.PI/2);
+  const pos=g.attributes.position;
+  for(let i=0;i<pos.count;i++){
+   const e=pos.getX(i),n=-pos.getZ(i);
+   let y=terrainSampler(e,n);
+   const d=Math.hypot(e,n);
+   if(d>1100)y*=Math.max(0,1-(d-1100)/500); // raccordo dolce verso l'orizzonte
+   pos.setY(i,y);}
+  let mat=new THREE.MeshBasicMaterial({map:makeGroundTex()});
+  let cred='rilievo: NASA SRTM (AWS Terrain Tiles)';
+  try{
+   const Zi=16;
+   const img=await fetchGrid(Zi,7,(z,x,y)=>
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+'.png',lat,lon);
+   if(my!==groundId)return;
+   img.g.fillStyle='rgba(12,9,20,0.5)';img.g.fillRect(0,0,img.size,img.size); // notte
+   const uv=g.attributes.uv;
+   for(let i=0;i<pos.count;i++){
+    const e=pos.getX(i),n=-pos.getZ(i);
+    const t=ll2tile(lat+n/mlat,lon+e/mlon,Zi);
+    uv.setXY(i,(t[0]*256-img.px0)/img.size,1-(t[1]*256-img.py0)/img.size);}
+   uv.needsUpdate=true;
+   const tex=new THREE.CanvasTexture(img.cv);tex.anisotropy=4;
+   mat=new THREE.MeshBasicMaterial({map:tex});
+   cred+=' \u00b7 foto aerea: Esri World Imagery';
+   // tappeto ad alta risoluzione (z18, ~0.5 m/px) sul km centrale
+   try{
+    const Zh=18;
+    const hi=await fetchGrid(Zh,9,(z,x,y)=>
+     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+'.png',lat,lon);
+    if(my!==groundId)return;
+    hi.g.fillStyle='rgba(12,9,20,0.5)';hi.g.fillRect(0,0,hi.size,hi.size);
+    const S2=1000,SEG2=100;
+    const g2=new THREE.PlaneGeometry(S2,S2,SEG2,SEG2);
+    g2.rotateX(-Math.PI/2);
+    const p2=g2.attributes.position,uv2=g2.attributes.uv;
+    for(let i=0;i<p2.count;i++){
+     const e=p2.getX(i),n=-p2.getZ(i);
+     p2.setY(i,terrainSampler(e,n)+0.15);
+     const t=ll2tile(lat+n/mlat,lon+e/mlon,Zh);
+     uv2.setXY(i,(t[0]*256-hi.px0)/hi.size,1-(t[1]*256-hi.py0)/hi.size);}
+    uv2.needsUpdate=true;
+    const t2=new THREE.CanvasTexture(hi.cv);t2.anisotropy=4;
+    groundGroup.add(new THREE.Mesh(g2,new THREE.MeshBasicMaterial({map:t2})));
+   }catch(e){}
+  }catch(e){}
+  const terrain=new THREE.Mesh(g,mat);
+  groundGroup.add(terrain);
+  snapMonuments();
+  document.getElementById('cred').textContent=cred+' \u00b7 ';
+ }catch(e){/* offline o tile mancanti: resta la sabbia procedurale */}
+}
+async function buildDrape(lat,lon,my,mlat,mlon,nota){
+ const S=2600,SEG=64;
+ const g=new THREE.PlaneGeometry(S,S,SEG,SEG);g.rotateX(-Math.PI/2);
+ const pos=g.attributes.position;
+ for(let i=0;i<pos.count;i++)pos.setY(i,0.05);
+ let mat=new THREE.MeshBasicMaterial({map:makeGroundTex()});
+ let cred=nota;
+ try{
+  const Zi=16;
+  const img=await fetchGrid(Zi,7,(z,x,y)=>
+   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+'.png',lat,lon);
+  if(my!==groundId)return;
+  img.g.fillStyle='rgba(12,9,20,0.5)';img.g.fillRect(0,0,img.size,img.size);
+  const uv=g.attributes.uv;
+  for(let i=0;i<pos.count;i++){
+   const e=pos.getX(i),n=-pos.getZ(i);
+   const t=ll2tile(lat+n/mlat,lon+e/mlon,Zi);
+   uv.setXY(i,(t[0]*256-img.px0)/img.size,1-(t[1]*256-img.py0)/img.size);}
+  uv.needsUpdate=true;
+  const tex=new THREE.CanvasTexture(img.cv);tex.anisotropy=4;
+  mat=new THREE.MeshBasicMaterial({map:tex});
+  cred+=' \u00b7 foto aerea: Esri World Imagery';
+  try{ // tappeto ad alta risoluzione sul km centrale
+   const Zh=18;
+   const hi=await fetchGrid(Zh,9,(z,x,y)=>
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+'.png',lat,lon);
+   if(my!==groundId)return;
+   hi.g.fillStyle='rgba(12,9,20,0.5)';hi.g.fillRect(0,0,hi.size,hi.size);
+   const g2=new THREE.PlaneGeometry(1000,1000,60,60);g2.rotateX(-Math.PI/2);
+   const p2=g2.attributes.position,uv2=g2.attributes.uv;
+   for(let i=0;i<p2.count;i++){
+    const e=p2.getX(i),n=-p2.getZ(i);
+    p2.setY(i,0.2);
+    const t=ll2tile(lat+n/mlat,lon+e/mlon,Zh);
+    uv2.setXY(i,(t[0]*256-hi.px0)/hi.size,1-(t[1]*256-hi.py0)/hi.size);}
+   uv2.needsUpdate=true;
+   const t2=new THREE.CanvasTexture(hi.cv);t2.anisotropy=4;
+   groundGroup.add(new THREE.Mesh(g2,new THREE.MeshBasicMaterial({map:t2})));
+  }catch(e){}
+ }catch(e){}
+ groundGroup.add(new THREE.Mesh(g,mat));
+ snapMonuments();
+ document.getElementById('cred').textContent=cred+' \u00b7 ';
+}
+function snapMonuments(){
+ if(!terrainSampler)return;
+ for(const m of monuments){
+  let y=terrainSampler(m.e,m.n);
+  if(!isFinite(y)||y<-300||y>800)y=0;  // rete di sicurezza: quota sospetta = quota del sito
+  m.obj.position.y=y+m.lift;
+  if(m.edges)m.edges.position.y=y+m.lift;
+  if(m.label)m.label.position.y=y+m.labelLift;}}
+// ============ AMBIENTE — realismo v1 ============
+function makeSky(){
+ const g=new THREE.SphereGeometry(R+60,48,32);
+ const pos=g.attributes.position,col=new Float32Array(pos.count*3);
+ for(let i=0;i<pos.count;i++){
+  const y=pos.getY(i)/(R+60);
+  const t=Math.pow(Math.max(0,Math.min(1,(y+0.06)/1.06)),0.55);
+  // orizzonte caldo (velo atmosferico) -> zenit quasi nero
+  col[i*3]  =0.115*(1-t)+0.010*t;
+  col[i*3+1]=0.070*(1-t)+0.007*t;
+  col[i*3+2]=0.135*(1-t)+0.020*t;}
+ g.setAttribute('color',new THREE.BufferAttribute(col,3));
+ scene.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+ // bagliore d'alba a est (visibile solo nella scena "Alba equinozio")
+ const dc=document.createElement('canvas');dc.width=dc.height=256;
+ const dg=dc.getContext('2d');
+ const grad=dg.createRadialGradient(128,128,10,128,128,128);
+ grad.addColorStop(0,'rgba(255,178,92,0.85)');
+ grad.addColorStop(0.35,'rgba(220,120,60,0.35)');
+ grad.addColorStop(1,'rgba(180,80,50,0)');
+ dg.fillStyle=grad;dg.fillRect(0,0,256,256);
+ dawnGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(dc),
+  transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+ dawnGlow.scale.set(1400,700,1);
+ const [dx,dy,dz]=azalt2xyz(90,3,R+20);dawnGlow.position.set(dx,dy,dz);
+ dawnGlow.visible=false;scene.add(dawnGlow);
+}
+function makeGlowTex(){
+ const c=document.createElement('canvas');c.width=c.height=128;
+ const g=c.getContext('2d');
+ const grad=g.createRadialGradient(64,64,2,64,64,64);
+ grad.addColorStop(0,'rgba(255,248,225,1)');
+ grad.addColorStop(0.25,'rgba(234,217,168,0.45)');
+ grad.addColorStop(1,'rgba(234,217,168,0)');
+ g.fillStyle=grad;g.fillRect(0,0,128,128);
+ return new THREE.CanvasTexture(c);
+}
+function makeGroundTex(){
+ const c=document.createElement('canvas');c.width=c.height=512;
+ const g=c.getContext('2d');
+ g.fillStyle='#2b1a14';g.fillRect(0,0,512,512);
+ for(let i=0;i<9000;i++){
+  g.fillStyle='rgba('+(130+Math.random()*70|0)+','+(95+Math.random()*45|0)+','+(60+Math.random()*30|0)+','+(Math.random()*0.12).toFixed(3)+')';
+  const s=Math.random()*1.8+0.4;
+  g.fillRect(Math.random()*512,Math.random()*512,s,s);}
+ for(let i=0;i<60;i++){ // chiazze piu' scure, dune lontane
+  g.fillStyle='rgba(10,5,8,'+(Math.random()*0.08).toFixed(3)+')';
+  g.beginPath();g.ellipse(Math.random()*512,Math.random()*512,20+Math.random()*60,8+Math.random()*20,Math.random()*Math.PI,0,2*Math.PI);g.fill();}
+ const t=new THREE.CanvasTexture(c);
+ t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,6);
+ return t;
+}
+const LINEDEF=[['Betelgeuse','Bellatrix'],['Bellatrix','Mintaka'],['Mintaka','Alnilam'],
+ ['Alnilam','Alnitak'],['Alnitak','Saiph'],['Saiph','Rigel'],['Rigel','Mintaka'],['Betelgeuse','Alnitak']];
+// dati dei monumenti: ora in catalogo.js
+function azalt2xyz(az,alt,r){const a=az*D2R,h=alt*D2R;
+ return [r*Math.cos(h)*Math.sin(a),r*Math.sin(h),-r*Math.cos(h)*Math.cos(a)];}
+function makeLabel(text,scale){
+ const c=document.createElement('canvas');c.width=256;c.height=64;
+ const g=c.getContext('2d');g.font='28px Georgia';g.fillStyle='#EAD9A8';
+ g.textAlign='center';g.fillText(text,128,40);
+ const m=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));
+ m.scale.set(scale,scale/4,1);return m;}
+function bc(y){return y<=0 ? (1-y).toLocaleString('it')+" a.C." : Math.round(y)+" d.C.";}
+function init(){
+ scene=new THREE.Scene();
+ camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,6000);
+ camera.position.set(0,1.7,0);
+ renderer=new THREE.WebGLRenderer({antialias:true});
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.xr.enabled=true;
+ document.body.appendChild(renderer.domElement);
+ rig=new THREE.Group();rig.add(camera);scene.add(rig);
+ setupVRControls();
+ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+ let drag=false,px=0,py=0;
+ renderer.domElement.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});
+ addEventListener('pointerup',()=>drag=false);
+ addEventListener('pointermove',e=>{if(!drag)return;
+  yaw-=(e.clientX-px)*0.18;pitch+=(e.clientY-py)*0.18;
+  pitch=Math.max(-25,Math.min(89,pitch));px=e.clientX;py=e.clientY;});
+ makeSky();
+ glowTex=makeGlowTex();
+ for(const s of CAT){
+  const size=Math.max(3,14*Math.pow(10,-0.15*s[5]));
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(size,10,8),
+   new THREE.MeshBasicMaterial({color:0xEAD9A8}));
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,
+   transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+  glow.scale.set(size*7,size*7,1);
+  const label=makeLabel(s[0],200);
+  scene.add(mesh);scene.add(glow);scene.add(label);
+  stars[s[0]]={mesh,label,glow};}
+ for(const _ of LINEDEF){
+  const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
+  const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xD4A94A,transparent:true,opacity:0.5}));
+  scene.add(l);lines.push(l);}
+ sun=new THREE.Mesh(new THREE.SphereGeometry(28,16,12),
+  new THREE.MeshBasicMaterial({color:0xF2C14E}));
+ sunGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0xF2C14E,
+  transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+ sunGlow.scale.set(340,340,1);
+ scene.add(sun);scene.add(sunGlow);
+ const Y=document.getElementById('year'), T=document.getElementById('tline');
+ Y.addEventListener('input',()=>{T.value=Y.value;update();});
+ T.addEventListener('input',()=>{Y.value=T.value;update();});
+ document.getElementById('scene').addEventListener('change',()=>{
+  document.getElementById('lstbox').style.display=
+   document.getElementById('scene').value==='free'?'block':'none';update();});
+ document.getElementById('lst').addEventListener('input',update);
+ document.getElementById('site').addEventListener('change',()=>{buildGround();update();});
+ if(navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(ok=>{
+   if(ok) document.getElementById('vrbtn').style.display='block';});
+ menuDalCatalogo();
+ buildGround();update();
+ renderer.setAnimationLoop(()=>{
+  playCur+=(playDir-playCur)*0.07;                 // rampa dolce in partenza e in frenata
+  if(Math.abs(playCur)<0.004){playCur=0;}
+  if(playCur!==0){
+   let y=parseFloat(Y.value)+playCur*30;
+   y=Math.max(-100000,Math.min(100000,y));
+   Y.value=Math.round(y);T.value=Y.value;update();
+   if(y<=-100000||y>=100000){playDir=0;playCur=0;}}
+  if(renderer.xr.isPresenting){pollVR();}
+  else{
+   if(vrHud)vrHud.sp.visible=false;
+   const yw=yaw*D2R,p=pitch*D2R;
+   camera.lookAt(Math.cos(p)*Math.sin(yw),1.7+Math.sin(p),-Math.cos(p)*Math.cos(yw));}
+  renderer.render(scene,camera);});
+}
+function play(d){playDir=d;}
+function enterVR(){navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor']})
+ .then(s=>{s.addEventListener('end',()=>{rig.rotation.y=0;});renderer.xr.setSession(s);});}
+// ============ COMANDI VR (Meta Quest) ============
+function setupVRControls(){
+ for(let i=0;i<2;i++){
+  const c=renderer.xr.getController(i);
+  c.userData={hand:null,gp:null,prev:{t:false,g:false,a:false,b:false,snap:0}};
+  c.addEventListener('connected',e=>{c.userData.hand=e.data.handedness;c.userData.gp=e.data.gamepad||null;});
+  c.addEventListener('disconnected',()=>{c.userData.gp=null;});
+  const lg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-4)]);
+  c.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xD4A94A,transparent:true,opacity:0.6})));
+  rig.add(c);controllers.push(c);}
+ const cv=document.createElement('canvas');cv.width=1024;cv.height=192;
+ const tex=new THREE.CanvasTexture(cv);
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+ sp.scale.set(2.6,0.49,1);sp.position.set(0,1.05,-2.8);sp.visible=false;
+ rig.add(sp);vrHud={cv,tex,sp};
+}
+function updateHud(){
+ if(!vrHud)return;const g=vrHud.cv.getContext('2d');
+ g.clearRect(0,0,1024,192);
+ g.textAlign='center';g.fillStyle='#EAD9A8';g.font='64px Georgia';
+ g.fillText(bc(parseFloat(document.getElementById('year').value)),512,70);
+ g.fillStyle='#D4A94A';g.font='30px Georgia';
+ g.fillText(poleTxt,512,116);
+ g.font='24px Georgia';g.fillStyle='#8a6f3a';
+ g.fillText('stick sx: tempo \u00b7 stick dx: ruota \u00b7 grilletto: lento \u00b7 presa: veloce \u00b7 A: scena \u00b7 B: sito',512,164);
+ vrHud.tex.needsUpdate=true;
+}
+function setYear(y){y=Math.max(-100000,Math.min(100000,Math.round(y/10)*10));
+ document.getElementById('year').value=y;document.getElementById('tline').value=y;update();}
+function cycleSelect(id){const s=document.getElementById(id);
+ s.selectedIndex=(s.selectedIndex+1)%s.options.length;
+ s.dispatchEvent(new Event('change'));}
+function pollVR(){
+ vrHud.sp.visible=true;
+ for(const c of controllers){
+  const gp=c.userData.gp,P=c.userData.prev;if(!gp)continue;
+  const ax=gp.axes,sx=(ax.length>=4?ax[2]:(ax[0]||0));
+  if(c.userData.hand==='left'){
+   if(Math.abs(sx)>0.15)setYear(parseFloat(document.getElementById('year').value)+sx*Math.abs(sx)*25);
+  }else{
+   if(sx>0.6&&P.snap!==1){rig.rotation.y-=Math.PI/6;P.snap=1;}
+   else if(sx<-0.6&&P.snap!==-1){rig.rotation.y+=Math.PI/6;P.snap=-1;}
+   else if(Math.abs(sx)<0.3)P.snap=0;}
+  const b=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed);
+  // grilletto = marcia lenta, presa laterale = marcia veloce (nel visore serve delicatezza)
+  if(b(0)&&!P.t){playDir=(playDir!==0)?0:(c.userData.hand==='left'?-0.12:0.12);}P.t=b(0);
+  if(b(1)&&!P.g){playDir=(playDir!==0)?0:(c.userData.hand==='left'?-1:1);}P.g=b(1);
+  if(b(4)&&!P.a){cycleSelect('scene');}P.a=b(4);
+  if(b(5)&&!P.b){cycleSelect('site');}P.b=b(5);
+ }
+}
+function menuDalCatalogo(){
+ if(!window.CATALOGO)return;
+ const sel=document.getElementById('site');
+ const voci=[];
+ for(const k in CATALOGO){const s=CATALOGO[k];
+  for(const o of (s.osservatori||[])){
+   const op=document.createElement('option');
+   op.value=o.lat+','+o.lon;
+   op.textContent=s.nome.replace('Piana di ','')+' \u2014 '+o.nome;
+   voci.push(op);}}
+ for(let i=voci.length-1;i>=0;i--)sel.insertBefore(voci[i],sel.firstChild);
+ sel.selectedIndex=0;
+}
+function trovaSito(lat,lon){
+ if(!window.CATALOGO)return null;
+ for(const k in CATALOGO){const s=CATALOGO[k];
+  if(Math.abs(lat-s.centro.lat)<(s.raggio||0.05)&&Math.abs(lon-s.centro.lon)<(s.raggio||0.05))return s;}
+ return null;}
+function buildGround(){
+ const my=++groundId;
+ if(groundGroup)scene.remove(groundGroup);
+ groundGroup=new THREE.Group();monuments=[];terrainSampler=null;
+ const parts=document.getElementById('site').value.split(',');
+ const lat=parseFloat(parts[0]),lon=parseFloat(parts[1]);
+ const ground=new THREE.Mesh(new THREE.CircleGeometry(R+50,64),
+  new THREE.MeshBasicMaterial({map:makeGroundTex()}));
+ ground.rotation.x=-Math.PI/2;ground.position.y=-0.3;groundGroup.add(ground);
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(R-5,2.2,8,128),
+  new THREE.MeshBasicMaterial({color:0xD4A94A}));
+ ring.rotation.x=Math.PI/2;ring.position.y=0.5;groundGroup.add(ring);
+ for(const [az,txt] of [[0,'NORD'],[90,'EST'],[180,'SUD'],[270,'OVEST']]){
+  const l=makeLabel(txt,220);const [x,y,z]=azalt2xyz(az,1.5,R-40);
+  l.position.set(x,y+30,z);groundGroup.add(l);}
+ const mlat=110861,mlon=111320*Math.cos(lat*D2R);
+ const EN=(plat,plon)=>[(plon-lon)*mlon,(plat-lat)*mlat];
+ // ---- costruzione dal CATALOGO (catalogo.js) ----
+ const sito=trovaSito(lat,lon);
+ const etichette=[];   // per districare quelle che si accavallano
+ if(sito){
+  const forza=new URLSearchParams(location.search).get('tutto')==='1';
+  const trovato={};
+  for(const el of sito.elementi){
+   if(!el.attivo&&!forza)continue;
+   if(el.tipo==='nastro')continue;              // i nastri si tracciano dopo
+   const [e0,n0]=EN(el.lat,el.lon);
+   const e=e0+(el.offsetEst||0),n=n0+(el.offsetNord||0);
+   trovato[el.id]={e,n};
+   const dist=Math.hypot(e,n);
+   if(dist>R-100)continue;
+   const incerto=(el.fonte==='approssimato');
+   const oro=incerto?0x8a6f3a:0xD4A94A;
+   // ingombro dell'elemento: se l'osservatore ci sta dentro, lo si rende trasparente
+   const raggio=el.tipo==='piramide'?el.base/2
+              :(el.tipo==='marker'?el.raggio
+              :Math.max(el.lunghezza||0,el.larghezza||0)/2);
+   const dentro=dist<raggio*1.15;
+   if(el.tipo==='piramide'){
+    const py=new THREE.Mesh(new THREE.ConeGeometry(el.base/Math.SQRT2,el.altezza,4),
+     dentro?new THREE.MeshBasicMaterial({color:0x1d0d10,transparent:true,opacity:0.12,depthWrite:false})
+           :new THREE.MeshBasicMaterial({color:0x1d0d10}));
+    py.position.set(e,el.altezza/2,-n);py.rotation.y=Math.PI/4;
+    const ed=new THREE.LineSegments(new THREE.EdgesGeometry(py.geometry),
+     new THREE.LineBasicMaterial({color:oro,transparent:incerto,opacity:incerto?0.5:1}));
+    ed.position.copy(py.position);ed.rotation.copy(py.rotation);
+    const lb=makeLabel(el.nome,180);lb.position.set(e,el.altezza+40,-n);
+    groundGroup.add(py);groundGroup.add(ed);groundGroup.add(lb);
+    const mo={obj:py,edges:ed,label:lb,e,n,lift:el.altezza/2,labelLift:el.altezza+40};
+    monuments.push(mo);etichette.push({mo,lb,e,n,dist});
+    if(el.rivestimento){ // calotta di calcare ancora in posto
+     const CH=el.rivestimento,rb=(el.base/Math.SQRT2)*(CH/el.altezza);
+     const cap=new THREE.Mesh(new THREE.ConeGeometry(rb,CH,4),
+      new THREE.MeshBasicMaterial({color:0x6d5b46}));
+     cap.position.set(e,el.altezza-CH/2,-n);cap.rotation.y=Math.PI/4;
+     groundGroup.add(cap);
+     monuments.push({obj:cap,e,n,lift:el.altezza-CH/2,labelLift:0});}
+    if(el.zoccolo){ // corsi inferiori in granito
+     const GH=el.zoccolo,rb=el.base/Math.SQRT2,rt=rb*(1-GH/el.altezza);
+     const gr=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,GH,4),
+      new THREE.MeshBasicMaterial({color:0x3d1a18}));
+     gr.position.set(e,GH/2,-n);gr.rotation.y=Math.PI/4;
+     groundGroup.add(gr);
+     monuments.push({obj:gr,e,n,lift:GH/2,labelLift:0});}
+   }else if(el.tipo==='blocco'||el.tipo==='recinto'){
+    const pieno=(el.tipo==='blocco');
+    const bx=new THREE.Mesh(new THREE.BoxGeometry(el.lunghezza,el.altezza,el.larghezza),
+     (pieno&&!dentro)?new THREE.MeshBasicMaterial({color:0x241014})
+     :new THREE.MeshBasicMaterial({color:oro,wireframe:true,transparent:true,opacity:dentro?0.25:0.4}));
+    bx.position.set(e,el.altezza/2,-n);
+    bx.rotation.y=-((el.azimut||90)-90)*D2R;
+    let ed=null;
+    if(pieno){ed=new THREE.LineSegments(new THREE.EdgesGeometry(bx.geometry),
+      new THREE.LineBasicMaterial({color:oro}));
+     ed.position.copy(bx.position);ed.rotation.copy(bx.rotation);groundGroup.add(ed);}
+    const lb=makeLabel(el.nome,pieno?150:170);
+    lb.position.set(e,el.altezza+(dentro?90:35),-n);
+    groundGroup.add(bx);groundGroup.add(lb);
+    const mo={obj:bx,edges:ed,label:lb,e,n,lift:el.altezza/2,labelLift:el.altezza+(dentro?90:35)};
+    monuments.push(mo);etichette.push({mo,lb,e,n,dist});
+   }else if(el.tipo==='marker'){
+    const co=new THREE.Mesh(new THREE.ConeGeometry(el.raggio,el.altezza,24),
+     new THREE.MeshBasicMaterial({color:oro,wireframe:true,transparent:true,opacity:0.45}));
+    co.position.set(e,el.altezza/2,-n);
+    const lb=makeLabel(el.nome,150);lb.position.set(e,el.altezza+32,-n);
+    groundGroup.add(co);groundGroup.add(lb);
+    const mo={obj:co,label:lb,e,n,lift:el.altezza/2,labelLift:el.altezza+32};
+    monuments.push(mo);etichette.push({mo,lb,e,n,dist});}}
+  // nastri (rampe, allineamenti) fra elementi gia' posizionati
+  for(const el of sito.elementi){
+   if(el.tipo!=='nastro'||(!el.attivo&&!forza))continue;
+   const A=trovato[el.da],B=trovato[el.a];if(!A||!B)continue;
+   const dx=B.e-A.e,dz=(-B.n)-(-A.n),L=Math.hypot(dx,dz);
+   if(L<10)continue;
+   const nastro=new THREE.Mesh(new THREE.BoxGeometry(L*0.85,el.altezza||1,el.larghezza||5),
+    new THREE.MeshBasicMaterial({color:0xD4A94A,transparent:true,opacity:0.35}));
+   nastro.position.set((A.e+B.e)/2,(el.altezza||1)/2,(-A.n+-B.n)/2);
+   nastro.rotation.y=Math.atan2(-dz,dx);
+   groundGroup.add(nastro);
+   monuments.push({obj:nastro,e:(A.e+B.e)/2,n:(A.n+B.n)/2,lift:(el.altezza||1)/2,labelLift:0});}}
+ // districa le etichette vicine in direzione: la piu' lontana sale di un gradino
+ etichette.sort((a,b)=>a.dist-b.dist);
+ const messe=[];
+ for(const t of etichette){
+  const az=(Math.atan2(t.e,t.n)*R2D+360)%360;
+  let salto=0;
+  for(const m of messe){
+   let d=Math.abs(az-m.az);if(d>180)d=360-d;
+   if(d<6)salto=Math.max(salto,m.salto+1);}
+  messe.push({az,salto});
+  if(salto>0){
+   const su=salto*55;
+   t.lb.position.y+=su;
+   t.mo.labelLift+=su;}}
+ scene.add(groundGroup);
+ buildTerrain(lat,lon,my,mlat,mlon);
+}
+function update(){
+ const lat=parseFloat(document.getElementById('site').value.split(',')[0]);
+ const year=parseFloat(document.getElementById('year').value);
+ const mode=document.getElementById('scene').value;
+ const pos={};for(const s of CAT)pos[s[0]]=starOfDate(s,year);
+ let lst= mode==='dawn'?270: mode==='culm'?pos['Alnilam'][0]:
+  parseFloat(document.getElementById('lst').value);
+ document.getElementById('lstval').textContent=Math.round(lst)+'\u00b0';
+ let bestPole=null;
+ for(const s of CAT){
+  const [ra,dec]=pos[s[0]];
+  const pd=90-Math.abs(dec);
+  if(bestPole===null||pd<bestPole[1])bestPole=[s[0],pd];
+  const [alt,az]=altaz(ra,dec,lst,lat);
+  const o=stars[s[0]];
+  const vis=alt>-1;
+  o.mesh.visible=vis;o.label.visible=vis;o.glow.visible=vis;
+  if(vis){const [x,y,z]=azalt2xyz(az,alt,R);
+   o.mesh.position.set(x,y,z);o.glow.position.set(x,y,z);o.label.position.set(x,y+45,z);
+   o.glow.material.opacity=Math.min(1,0.35+Math.max(0,alt)/18);}}
+ LINEDEF.forEach(([a,b],i)=>{
+  const A=altaz(...pos[a],lst,lat),B=altaz(...pos[b],lst,lat);
+  const ok=A[0]>-1&&B[0]>-1;lines[i].visible=ok;
+  if(ok){const pts=lines[i].geometry.attributes.position.array;
+   const p1=azalt2xyz(A[1],A[0],R),p2=azalt2xyz(B[1],B[0],R);
+   pts[0]=p1[0];pts[1]=p1[1];pts[2]=p1[2];pts[3]=p2[0];pts[4]=p2[1];pts[5]=p2[2];
+   lines[i].geometry.attributes.position.needsUpdate=true;}});
+ sun.visible=(mode==='dawn');
+ sunGlow.visible=sun.visible;dawnGlow.visible=sun.visible;
+ if(sun.visible){const [x,y,z]=azalt2xyz(90,0.5,R);sun.position.set(x,y,z);sunGlow.position.set(x,y,z);}
+ document.getElementById('epoch').textContent=bc(year);
+ poleTxt='\u2605 al polo: '+bestPole[0]+' ('+bestPole[1].toFixed(1)+'\u00b0)';
+ document.getElementById('pole').textContent=poleTxt;
+ updateHud();
+}
+init();
+</script>
+</body>
+</html>
