@@ -172,26 +172,30 @@ function ll2tile(lat,lon,z){const n=Math.pow(2,z);
  const la=lat*D2R;
  const y=(1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n;
  return [x,y];}
-function loadTile(url){return new Promise((res,rej)=>{
- const im=new Image();im.crossOrigin='anonymous';
- im.onload=()=>res(im);im.onerror=rej;im.src=url;});}
-async function fetchGrid(z,cnt,urlFn,lat,lon){
+function loadTile(url,raw){
+ if(raw&&self.createImageBitmap){ // DEM: niente gestione colore, i byte devono restare intatti
+  return fetch(url,{mode:'cors'}).then(r=>r.blob())
+   .then(b=>createImageBitmap(b,{colorSpaceConversion:'none',premultiplyAlpha:'none'}));}
+ return new Promise((res,rej)=>{
+  const im=new Image();im.crossOrigin='anonymous';
+  im.onload=()=>res(im);im.onerror=rej;im.src=url;});}
+async function fetchGrid(z,cnt,urlFn,lat,lon,raw){
  const [tx,ty]=ll2tile(lat,lon,z);
  const cx=Math.floor(tx),cy=Math.floor(ty),h=(cnt-1)/2;
  const cv=document.createElement('canvas');cv.width=cv.height=cnt*256;
  const g=cv.getContext('2d');
  const jobs=[];
  for(let dx=-h;dx<=h;dx++)for(let dy=-h;dy<=h;dy++)
-  jobs.push(loadTile(urlFn(z,cx+dx,cy+dy)).then(im=>g.drawImage(im,(dx+h)*256,(dy+h)*256)));
+  jobs.push(loadTile(urlFn(z,cx+dx,cy+dy),raw).then(im=>g.drawImage(im,(dx+h)*256,(dy+h)*256)));
  await Promise.all(jobs);
  return {cv,g,px0:(cx-h)*256,py0:(cy-h)*256,size:cnt*256};}
 async function buildTerrain(lat,lon,my,mlat,mlon){
  try{
   const Zt=14;
   const elev=await fetchGrid(Zt,3,(z,x,y)=>
-   'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/'+z+'/'+x+'/'+y+'.png',lat,lon);
+   'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/'+z+'/'+x+'/'+y+'.png',lat,lon,true);
   if(my!==groundId)return;
-  const data=elev.g.getImageData(0,0,elev.size,elev.size).data,ES=elev.size;
+  const data=elev.g.getImageData(0,0,elev.size,elev.size,{colorSpace:'srgb'}).data,ES=elev.size;
   const hRaw=(la,lo)=>{const t=ll2tile(la,lo,Zt);
    let px=Math.round(t[0]*256-elev.px0),py=Math.round(t[1]*256-elev.py0);
    px=Math.max(0,Math.min(ES-1,px));py=Math.max(0,Math.min(ES-1,py));
@@ -201,8 +205,20 @@ async function buildTerrain(lat,lon,my,mlat,mlon){
    return (isFinite(v)&&v>-500&&v<9000)?v:null;}; // fuori range = dato non valido
   const h0=hRaw(lat,lon);
   if(h0===null)return;                          // niente quota al sito: si resta sulla sabbia
-  terrainSampler=(e,n)=>{const v=hRaw(lat+n/mlat,lon+e/mlon);
-   return v===null?0:v-h0;};
+  // controllo di plausibilita': dislivello su 2 km entro limiti ragionevoli
+  let mn=1e9,mx=-1e9,bad=0,tot=0;
+  for(let a=-1000;a<=1000;a+=100)for(let b=-1000;b<=1000;b+=100){
+   const v=hRaw(lat+b/mlat,lon+a/mlon);tot++;
+   if(v===null){bad++;continue;}
+   if(v<mn)mn=v;if(v>mx)mx=v;}
+  const dislivello=mx-mn;
+  const demOK=(bad/tot<0.2)&&isFinite(dislivello)&&dislivello<400;
+  if(!demOK){ // rilievo inaffidabile: terreno piatto, ma foto aerea e monumenti restano
+   terrainSampler=()=>0;
+   console.warn('Rilievo scartato (dislivello '+Math.round(dislivello)+' m, '+bad+'/'+tot+' letture nulle): terreno reso piano.');
+  }else{
+   terrainSampler=(e,n)=>{const v=hRaw(lat+n/mlat,lon+e/mlon);
+    return v===null?0:v-h0;};}
   const SIZE=2600,SEG=128;
   const g=new THREE.PlaneGeometry(SIZE,SIZE,SEG,SEG);
   g.rotateX(-Math.PI/2);
