@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Precessio — Lo Specchio Incompleto</title>
+<style>
+  :root { --bord:#6B1F2A; --gold:#D4A94A; --goldl:#EAD9A8; --bg:#160A0D; --panel:#241014; }
+  body { background:var(--bg); color:var(--goldl); font-family:Georgia,serif; margin:0; padding:18px; }
+  h1 { color:var(--goldl); text-align:center; letter-spacing:3px; margin:6px 0 0; font-size:30px; }
+  .sub { text-align:center; color:var(--gold); font-style:italic; margin:2px 0 14px; font-size:13.5px; }
+  .wrap { max-width:1000px; margin:0 auto; }
+  .panel { background:var(--panel); border:2px solid var(--bord); border-radius:8px; padding:12px 14px; margin-bottom:12px; }
+  label { color:var(--gold); font-size:12px; display:block; margin-bottom:3px; }
+  select,input { background:#1d0d10; color:var(--goldl); border:1px solid var(--bord); border-radius:4px; padding:5px 7px; font-family:inherit; font-size:14px; }
+  .btn { background:var(--bord); color:#fff; cursor:pointer; letter-spacing:1px; border:1px solid var(--gold); padding:6px 12px; }
+  .btn2 { background:#1d0d10; color:var(--gold); cursor:pointer; border:1px solid var(--bord); padding:5px 10px; font-size:12.5px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+  canvas { width:100%; background:#100708; border:2px solid var(--bord); border-radius:6px; display:block; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13.5px; }
+  th { background:var(--bord); color:#fff; padding:4px 8px; text-align:left; font-weight:normal; }
+  td { padding:4px 8px; border-bottom:1px solid #3a1a20; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .hit { color:#9c6; } .void { color:#c98; font-style:italic; }
+  .verd { color:var(--goldl); font-size:14px; margin-top:8px; }
+  a { color:var(--gold); }
+  .foot { text-align:center; color:var(--gold); font-size:11px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LO SPECCHIO INCOMPLETO</h1>
+  <div class="sub">proiezione del cielo sulla piana di Giza &middot; ancoraggio: Alnitak&rarr;Cheope, Alnilam&rarr;Chefren &middot; tutto il resto &egrave; predizione misurabile</div>
+
+  <div class="panel">
+    <div class="row">
+      <div><label>Epoca (anno astron.)</label><input id="year" type="number" step="50" value="-2499" style="width:90px" onchange="run()"></div>
+      <div><label>Epoche rapide</label>
+        <input type="button" class="btn2" value="2500 a.C." onclick="setY(-2499)">
+        <input type="button" class="btn2" value="10450 a.C." onclick="setY(-10449)">
+        <input type="button" class="btn2" value="12100 a.C." onclick="setY(-12099)">
+        <input type="button" class="btn2" value="36400 a.C." onclick="setY(-36399)">
+        <input type="button" class="btn2" value="2800 a.C. (Thuban al polo)" onclick="setY(-2799)">
+        <input type="button" class="btn2" value="2560 a.C. (data convenzionale)" onclick="setY(-2559)">
+      </div>
+      <div><label>Chiralit&agrave; dello specchio</label>
+        <select id="mirror" onchange="run()">
+          <option value="1" selected>SPECULARE (inversione di Krupp)</option>
+          <option value="0">diretto (senza inversione)</option>
+        </select></div>
+      <div><label>Vista</label>
+        <select id="zoom" onchange="run()">
+          <option value="piana">La piana (monumenti)</option>
+          <option value="tutto" selected>Estesa (fino a Sirio)</option>
+        </select></div>
+    </div>
+    <div class="verd" id="verd"></div>
+  </div>
+
+  <div class="panel"><canvas id="map" width="1000" height="640"></canvas></div>
+
+  <div class="panel">
+    <table id="tab"><thead><tr>
+      <th>Stella proiettata</th><th>Lat (&deg;N)</th><th>Lon (&deg;E)</th><th>Punto noto pi&ugrave; vicino</th><th>Distanza</th>
+    </tr></thead><tbody></tbody></table>
+    <div style="margin-top:8px"><input type="button" class="btn2" value="&#8681; COPIA COORDINATE (per Google Earth)" onclick="copyCoords()"> <span id="copied" style="color:#9c6"></span></div>
+  </div>
+  <div class="foot"><a href="planetario.html">&larr; Il Nastro</a> &nbsp;&middot;&nbsp; <a href="index.html">Precessio</a> &nbsp;&middot;&nbsp; modello Vondr&aacute;k + moto proprio 3D &middot; laboratorio ADE 444</div>
+</div>
+<script>
+// ===== motore essenziale (Vondrak + 3D) =====
+const AS2R=Math.PI/(180*3600),EPS0=84381.406*AS2R,D2R=Math.PI/180,R2D=180/Math.PI;
+const precVals=[[1/402.90,-22206.325946,1267.727824,-13765.924050,-3243.236469,-8571.476251,-2206.967126],[1/256.75,12236.649447,1702.324248,13511.858383,-3969.723769,5309.796459,-4186.752711],[1/292.00,-1589.008343,-2970.553839,-1455.229106,7099.207893,-610.393953,6737.949677],[1/537.22,2482.103195,693.790312,1054.394467,-1903.696711,923.201931,-856.922846],[1/241.45,150.322920,-14.724451,0,146.435014,3.759055,0],[1/375.22,-13.632066,-516.649401,-112.300144,1300.630106,-40.691114,957.149088],[1/157.87,389.437420,-356.794454,202.769908,1727.498039,80.437484,1709.440735],[1/274.20,2031.433792,-129.552058,1936.050095,299.854055,807.300668,154.425505],[1/203.00,363.748303,256.129314,0,-1217.125982,83.712326,0],[1/440.00,-896.747562,190.266114,-655.484214,-471.367487,-368.654854,-243.520976],[1/170.72,-926.995700,95.103991,-891.898637,-441.682145,-191.881064,-406.539008],[1/713.37,37.070667,-332.907067,0,-86.169171,-4.263770,0],[1/313.00,-597.682468,131.337633,0,-308.320429,-270.353691,0],[1/128.38,66.282812,82.731919,-333.322021,-422.815629,11.602861,-446.656435],[1/202.00,0,0,327.517465,0,0,-1049.071786],[1/315.00,0,0,-494.780332,0,0,-301.504189],[1/136.32,0,0,585.492621,0,0,41.348740],[1/490.00,0,0,110.512834,0,0,142.525186]];
+function angles(T){const T2pi=T*2*Math.PI;let psi=0,ome=0,chi=0;
+ for(const r of precVals){const p=T2pi*r[0],c=Math.cos(p),s=Math.sin(p);
+  psi+=r[1]*c+r[4]*s;ome+=r[2]*c+r[5]*s;chi+=r[3]*c+r[6]*s;}
+ psi+=((289e-9*T-0.00740913)*T+5042.7980307)*T+8473.343527;
+ ome+=((151e-9*T+0.00000146)*T-0.4436568)*T+84283.175915;
+ chi+=((-61e-9*T+0.00001472)*T+0.0790159)*T-19.657270;
+ return [psi*AS2R,ome*AS2R,chi*AS2R];}
+function R1(a){const c=Math.cos(a),s=Math.sin(a);return [[1,0,0],[0,c,s],[0,-s,c]];}
+function R3(a){const c=Math.cos(a),s=Math.sin(a);return [[c,s,0],[-s,c,0],[0,0,1]];}
+function mm(A,B){const M=[[0,0,0],[0,0,0],[0,0,0]];
+ for(let i=0;i<3;i++)for(let j=0;j<3;j++)for(let k=0;k<3;k++)M[i][j]+=A[i][k]*B[k][j];return M;}
+function mv(A,v){return [A[0][0]*v[0]+A[0][1]*v[1]+A[0][2]*v[2],A[1][0]*v[0]+A[1][1]*v[1]+A[1][2]*v[2],A[2][0]*v[0]+A[2][1]*v[1]+A[2][2]*v[2]];}
+function precMatrix(T){const [psi,ome,chi]=angles(T);return mm(R3(chi),mm(R1(-ome),mm(R3(-psi),R1(EPS0))));}
+function vec(ra,dec){const r=ra*D2R,d=dec*D2R;return [Math.cos(d)*Math.cos(r),Math.cos(d)*Math.sin(r),Math.sin(d)];}
+function radec(v){const n=Math.hypot(v[0],v[1],v[2]);return [((Math.atan2(v[1],v[0])*R2D)+360)%360,Math.asin(v[2]/n)*R2D];}
+const CAT={
+ 'Alnitak':[85.18969,-1.94257,3.19,2.03,0,0],
+ 'Alnilam':[84.05339,-1.20192,1.49,-1.06,0,0],
+ 'Mintaka':[83.00167,-0.29910,0.64,-0.69,0,0],
+ 'Betelgeuse':[88.79294,7.40706,27.54,11.30,0,0],
+ 'Rigel':[78.63446,-8.20164,1.31,0.50,0,0],
+ 'Bellatrix':[81.28276,6.34970,-8.11,-12.88,0,0],
+ 'Saiph':[86.93912,-9.66960,1.55,-1.20,0,0],
+ 'Sirio':[101.28716,-16.71612,-546.01,-1223.07,379.21,-5.5],
+ 'Thuban':[211.097292,64.375851,-56.34,17.21,10.76,-13.0]};
+function starV(name,year){
+ const s=CAT[name];const [ra,dec,pmra,pmdec,plx,rv]=s;let raE,decE;
+ if(plx>0){const d=1000/plx,rr=vec(ra,dec),rar=ra*D2R,der=dec*D2R;
+  const p=[-Math.sin(rar),Math.cos(rar),0];
+  const q=[-Math.sin(der)*Math.cos(rar),-Math.sin(der)*Math.sin(rar),Math.cos(der)];
+  const k=AS2R/1000,dt=year-2000;
+  const vt=[(pmra*k*p[0]+pmdec*k*q[0])*d,(pmra*k*p[1]+pmdec*k*q[1])*d,(pmra*k*p[2]+pmdec*k*q[2])*d];
+  const vr=rv*1.0227e-6;
+  const pos=[rr[0]*d+(vt[0]+vr*rr[0])*dt,rr[1]*d+(vt[1]+vr*rr[1])*dt,rr[2]*d+(vt[2]+vr*rr[2])*dt];
+  [raE,decE]=radec(pos);
+ } else {const dt=year-2000;decE=dec+pmdec*dt/3.6e6;raE=ra+(pmra/Math.cos(dec*D2R))*dt/3.6e6;}
+ const T=(year-2000)/100;const v=mv(precMatrix(T),vec(raE,decE));
+ const n=Math.hypot(v[0],v[1],v[2]);return [v[0]/n,v[1]/n,v[2]/n];}
+// ===== monumenti (ENU metri rispetto a Chefren; x=Est, y=Nord) =====
+const KHAFRE=[29.975990,31.130751];   // centro MISURATO da ADE 444, 21/7/2026
+const mlat=110861.0, mlon=111320.0*Math.cos(29.977*D2R);
+function enu(lat,lon){return {x:(lon-KHAFRE[1])*mlon, y:(lat-KHAFRE[0])*mlat};}
+function geo(p){return [KHAFRE[0]+p.y/mlat, KHAFRE[1]+p.x/mlon];}
+const MON={
+ 'Cheope':enu(29.979142,31.134199),   // misurato
+ 'Chefren':{x:0,y:0},
+ 'Micerino':enu(29.972476,31.128271), // misurato
+ 'Grande Sfinge':enu(29.97528,31.13757),
+ 'Collinetta (2a Sfinge?)':enu(29.98334,31.12906)};
+// ===== lo specchio =====
+function skyPlane(year,mirror){
+ const c=starV('Alnilam',year);
+ let u=[-c[1],c[0],0];const un=Math.hypot(...u);u=[u[0]/un,u[1]/un,0];
+ const w=[c[1]*u[2]-c[2]*u[1],c[2]*u[0]-c[0]*u[2],c[0]*u[1]-c[1]*u[0]];
+ const out={};
+ for(const n in CAT){
+  const v=starV(n,year);
+  const d=v[0]*c[0]+v[1]*c[1]+v[2]*c[2];
+  const t=[v[0]/d,v[1]/d,v[2]/d];
+  const x=t[0]*u[0]+t[1]*u[1]+t[2]*u[2];
+  const y=t[0]*w[0]+t[1]*w[1]+t[2]*w[2];
+  out[n]={x:(mirror? -x:x), y:y};}
+ return out;}
+function cmul(a,b){return {x:a.x*b.x-a.y*b.y, y:a.x*b.y+a.y*b.x};}
+function csub(a,b){return {x:a.x-b.x,y:a.y-b.y};}
+function cadd(a,b){return {x:a.x+b.x,y:a.y+b.y};}
+function cdiv(a,b){const d=b.x*b.x+b.y*b.y;return {x:(a.x*b.x+a.y*b.y)/d, y:(a.y*b.x-a.x*b.y)/d};}
+function specchio(year,mirror){
+ const S=skyPlane(year,mirror);
+ const A=cdiv(csub(MON['Cheope'],MON['Chefren']),csub(S['Alnitak'],S['Alnilam']));
+ const B=csub(MON['Cheope'],cmul(A,S['Alnitak']));
+ const G={};for(const n in S)G[n]=cadd(cmul(A,S[n]),B);
+ return G;}
+// ===== interfaccia =====
+function setY(y){document.getElementById('year').value=y;run();}
+let lastCoords='';
+function run(){
+ const year=parseFloat(document.getElementById('year').value);
+ const mirror=document.getElementById('mirror').value==='1';
+ const zoom=document.getElementById('zoom').value;
+ const G=specchio(year,mirror);
+ // residuo Mintaka
+ const res=Math.hypot(G['Mintaka'].x-MON['Micerino'].x, G['Mintaka'].y-MON['Micerino'].y);
+ document.getElementById('verd').innerHTML=
+  'Ancore esatte per costruzione: Alnitak=Cheope, Alnilam=Chefren. '+
+  '<b>Test del terzo punto — Mintaka vs Micerino: scarto '+res.toFixed(0)+' m</b>'+
+  (mirror?' (specchio ribaltato: il cielo combacia solo cos\u00ec — l\u2019inversione di Krupp quantificata)':
+   ' (senza ribaltamento lo scarto \u00e8 ~3 volte peggiore: prova a confrontare)');
+ // tabella
+ const tb=document.querySelector('#tab tbody');tb.innerHTML='';
+ lastCoords='Specchio Incompleto — epoca '+year+' — proiezioni a terra\n';
+ for(const n in G){
+  const [lat,lon]=geo(G[n]);
+  let best=null;
+  for(const m in MON){const d=Math.hypot(G[n].x-MON[m].x,G[n].y-MON[m].y);
+   if(best===null||d<best[1])best=[m,d];}
+  const anchored=(n==='Alnitak'||n==='Alnilam');
+  const cls=best[1]<150?'hit':'void';
+  tb.insertAdjacentHTML('beforeend','<tr><td>'+n+(anchored?' (\u00e0ncora)':'')+'</td>'+
+   '<td class="num">'+lat.toFixed(5)+'</td><td class="num">'+lon.toFixed(5)+'</td>'+
+   '<td class="'+cls+'">'+(best[1]<150?best[0]:'\u2014 nel vuoto \u2014')+'</td>'+
+   '<td class="num">'+(best[1]<1000?best[1].toFixed(0)+' m':(best[1]/1000).toFixed(2)+' km')+'</td></tr>');
+  lastCoords+=n+': '+lat.toFixed(5)+', '+lon.toFixed(5)+'\n';}
+ draw(G,zoom);
+}
+function copyCoords(){
+ navigator.clipboard.writeText(lastCoords).then(()=>{
+  document.getElementById('copied').textContent='copiate!';
+  setTimeout(()=>document.getElementById('copied').textContent='',2000);});}
+function draw(G,zoom){
+ const cv=document.getElementById('map'),g=cv.getContext('2d');
+ g.fillStyle='#100708';g.fillRect(0,0,cv.width,cv.height);
+ // estensione
+ const pts=[];for(const m in MON)pts.push(MON[m]);
+ if(zoom==='tutto')for(const n in G)pts.push(G[n]);
+ let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
+ for(const p of pts){minx=Math.min(minx,p.x);maxx=Math.max(maxx,p.x);
+  miny=Math.min(miny,p.y);maxy=Math.max(maxy,p.y);}
+ const pad=0.12*Math.max(maxx-minx,maxy-miny);
+ minx-=pad;maxx+=pad;miny-=pad;maxy+=pad;
+ const sc=Math.min(cv.width/(maxx-minx),cv.height/(maxy-miny));
+ const X=x=>(x-minx)*sc, Y=y=>cv.height-(y-miny)*sc;
+ // bussola e scala
+ g.strokeStyle='#D4A94A';g.fillStyle='#D4A94A';g.font='13px Georgia';g.textAlign='left';
+ g.fillText('N \u2191',14,24);
+ const km=1000*sc;g.fillRect(14,cv.height-20,km,3);g.fillText('1 km',14,cv.height-28);
+ // linee di Orione proiettate
+ const L=[['Betelgeuse','Bellatrix'],['Bellatrix','Mintaka'],['Mintaka','Alnilam'],['Alnilam','Alnitak'],['Alnitak','Saiph'],['Saiph','Rigel'],['Rigel','Mintaka'],['Betelgeuse','Alnitak']];
+ g.strokeStyle='rgba(212,169,74,.4)';
+ for(const [a,b] of L){g.beginPath();g.moveTo(X(G[a].x),Y(G[a].y));g.lineTo(X(G[b].x),Y(G[b].y));g.stroke();}
+ // monumenti
+ g.textAlign='center';
+ for(const m in MON){const p=MON[m];
+  g.fillStyle='#6B1F2A';g.strokeStyle='#D4A94A';g.lineWidth=1.5;
+  g.beginPath();g.rect(X(p.x)-6,Y(p.y)-6,12,12);g.fill();g.stroke();
+  g.fillStyle='#D4A94A';g.font='12px Georgia';g.fillText(m,X(p.x),Y(p.y)-11);}
+ // stelle proiettate
+ for(const n in G){const p=G[n];
+  g.fillStyle='#EAD9A8';
+  g.beginPath();g.arc(X(p.x),Y(p.y),n==='Sirio'?7:5,0,7);g.fill();
+  g.fillStyle='#EAD9A8';g.font='italic 12px Georgia';g.fillText(n,X(p.x),Y(p.y)+20);}
+}
+run();
+</script>
+</body>
+</html>
