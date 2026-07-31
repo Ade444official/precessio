@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Precessio 3D — il Nastro del tempo profondo</title>
+<style>
+  :root { --bord:#6B1F2A; --gold:#D4A94A; --goldl:#EAD9A8; --bg:#0b0507; }
+  html,body { margin:0; height:100%; background:var(--bg); overflow:hidden; font-family:Georgia,serif; }
+  #bar { position:fixed; top:0; left:0; right:0; z-index:10; background:rgba(22,10,13,.92);
+         border-bottom:1px solid var(--bord); padding:3px 8px; display:flex; gap:6px; flex-wrap:wrap; align-items:end; }
+  #bar label { color:var(--gold); font-size:9px; display:block; line-height:1.1; }
+  #bar select,#bar input { background:#1d0d10; color:var(--goldl); border:1px solid var(--bord);
+         border-radius:3px; padding:1px 3px; font-family:inherit; font-size:11px; }
+  .btn { background:var(--bord); color:#fff; cursor:pointer; letter-spacing:1px; border:1px solid var(--gold); }
+  #title { color:var(--goldl); letter-spacing:2px; font-size:12px; align-self:center; margin-right:6px; }
+  #nastro { position:fixed; bottom:0; left:0; right:0; z-index:12; background:rgba(22,10,13,.92);
+         border-top:1px solid var(--bord); padding:3px 10px; display:flex; gap:6px; align-items:center; }
+  #tline { flex:1; }
+  #epoch { position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:11;
+         color:var(--goldl); font-size:26px; letter-spacing:2px; text-shadow:0 0 8px #000;
+         background:rgba(22,10,13,.55); padding:2px 18px; border-radius:8px; }
+  #pole { position:fixed; top:108px; left:50%; transform:translateX(-50%); z-index:11;
+         color:var(--gold); font-size:13px; background:rgba(22,10,13,.55); padding:2px 12px; border-radius:8px; }
+  #info { position:fixed; bottom:58px; left:12px; z-index:10; color:var(--gold); font-size:12px;
+          background:rgba(22,10,13,.7); padding:4px 10px; border-radius:6px; }
+  #vrbtn { position:fixed; bottom:8px; right:12px; z-index:10; display:none; padding:8px 14px; }
+  a { color:var(--gold); }
+  #prezzo { position:fixed; top:146px; left:50%; transform:translateX(-50%); z-index:11; display:none;
+     background:rgba(11,5,7,.80); border:1px solid var(--bord); border-radius:6px;
+     padding:4px 14px; color:#EAD9A8; font-family:Georgia,serif; font-size:12px;
+     text-align:center; max-width:80vw; }
+  #prezzo b { color:var(--gold); }
+  #bussola { position:fixed; right:12px; top:50%; transform:translateY(-50%); z-index:11;
+     pointer-events:none; text-align:center; }
+  #azlab { color:var(--goldl); font-family:Georgia,serif; font-size:12px; letter-spacing:1px;
+     background:rgba(11,5,7,.72); border:1px solid var(--bord); border-radius:4px;
+     padding:1px 8px; margin-top:2px; display:inline-block; }
+  #binocolo { position:fixed; inset:0; z-index:8; pointer-events:none; display:none; }
+  #binMask { position:absolute; inset:0;
+     background:radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 30%,
+        rgba(0,0,0,0.55) 31%, rgba(0,0,0,0.97) 36% 100%); }
+  #binRet { position:absolute; inset:0; width:100%; height:100%; }
+  #binDati { position:absolute; left:50%; bottom:14%; transform:translateX(-50%);
+     color:#EAD9A8; font-family:Georgia,serif; font-size:14px; text-align:center;
+     background:rgba(11,5,7,.72); border:1px solid var(--bord); border-radius:6px;
+     padding:5px 16px; letter-spacing:1px; white-space:nowrap; }
+  #binDati b { color:var(--gold); }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span id="title">P R E C E S S I O &nbsp;3D &middot; IL NASTRO</span>
+  <div><label>Sito (punto di osservazione)</label>
+    <select id="site">
+      <option value="37.2231,38.9225">G&ouml;bekli Tepe</option>
+      <option value="-16.5544,-68.6733">Tiwanaku</option>
+      <option value="-9.9,-67.8">Acre (geoglifi)</option>
+    </select></div>
+  <div><label>Scena</label>
+    <select id="scene">
+      <option value="dawn">Alba</option>
+      <option value="noon">Mezzogiorno</option>
+      <option value="dusk">Tramonto</option>
+      <option value="culm">Culminazione Cintura</option>
+      <option value="free">Orologio siderale</option>
+    </select></div>
+  <div><label>Momento dell'anno</label>
+    <select id="stagione">
+      <option value="0">Equinozio di primavera</option>
+      <option value="90">Solstizio d'estate</option>
+      <option value="180">Equinozio d'autunno</option>
+      <option value="270">Solstizio d'inverno</option>
+    </select></div>
+  <div style="border-left:2px solid var(--gold);padding-left:8px">
+    <label>Asse celeste: <span id="asseTv">0.00</span>&deg; verso <span id="asseDv">0</span>&deg;</label>
+    <input id="asseT" type="range" min="0" max="45" step="0.25" value="0" style="width:86px"
+      oninput="document.getElementById('asseTv').textContent=(+this.value).toFixed(2);aggiornaAsse()"><input
+      id="asseD" type="range" min="0" max="359" step="1" value="0" style="width:70px"
+      oninput="document.getElementById('asseDv').textContent=this.value;aggiornaAsse()">
+    <input type="button" class="btn2" value="azzera" style="padding:1px 6px;font-size:10px"
+      onclick="document.getElementById('asseT').value=0;document.getElementById('asseD').value=0;document.getElementById('asseTv').textContent='0.00';document.getElementById('asseDv').textContent='0';aggiornaAsse()">
+    <input type="button" class="btn2" value="MISURA IL COSTO" style="padding:1px 6px;font-size:10px" onclick="misuraCosto()">
+    <input type="button" class="btn2" value="&#9733; SORGERE ELIACO DI SIRIO" style="padding:1px 6px;font-size:10px" onclick="vaiAlSorgereEliaco()">
+    <input type="button" class="btn2" value="&#9790; FINESTRE DI ECLISSI" style="padding:1px 6px;font-size:10px" onclick="trovaStagioniEclissi()">
+  </div>
+  <div><label>Fase lunare</label>
+    <select id="fase">
+      <option value="-1">Luna assente</option>
+      <option value="0">Luna nuova</option>
+      <option value="45">falce crescente</option>
+      <option value="90">primo quarto</option>
+      <option value="135">gibbosa crescente</option>
+      <option value="180" selected>Luna piena</option>
+      <option value="225">gibbosa calante</option>
+      <option value="270">ultimo quarto</option>
+      <option value="315">falce calante</option>
+    </select></div>
+  <div id="lstbox" style="display:none"><label>Tempo siderale: <span id="lstval">270&deg;</span></label>
+    <input id="lst" type="range" min="0" max="360" step="0.01" value="270" style="width:130px"></div>
+</div>
+<div id="epoch"></div>
+<div id="pole"></div>
+<div id="bussola">
+  <svg id="rosa" viewBox="-50 -50 100 100" width="96" height="96"></svg>
+  <div id="azlab">&mdash;</div>
+</div>
+<div id="prezzo">asse nella posizione calcolata (nessuno spostamento imposto)</div>
+<div id="binocolo">
+  <div id="binMask"></div>
+  <svg id="binRet" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="binDati"></div>
+</div>
+<div id="nastro">
+  <input type="button" class="btn" value="&#9194;&#9194;" title="indietro veloce" onclick="play(-1)">
+  <input type="button" class="btn" value="&#9194;" title="indietro lento" onclick="play(-0.12)">
+  <input type="button" class="btn" id="btnPausa" value="&#9208;" title="pausa / riprendi" onclick="pausaRiprendi()">
+  <input type="button" class="btn" value="&#9193;" title="avanti lento" onclick="play(0.12)">
+  <input type="button" class="btn" value="&#9193;&#9193;" title="avanti veloce" onclick="play(1)">
+  <input id="tline" type="range" min="-200000" max="100000" step="10" value="-12099">
+  <input id="year" type="number" step="50" value="-12099" style="width:90px">
+</div>
+<div id="info"><b>WASD</b> muovi &middot; <b>E/Q</b> quota &middot; <b>1/2/3</b> marcia: <b><span id="marcia">crociera</span></b> &middot; <b>Z/X</b> o rotella: <b><span id="zoom">1.0&times;</span></b> &middot; <b>N</b> a piombo &middot; <b>H</b> orizzonte &middot; <b><span id="quota">a terra</span></b>
+ &middot; <b>M</b>: <b><span id="modo">dato + ricostruzione</span></b> &middot; <b>B</b> binocolo: <b><span id="bin">spento</span></b> &middot; <b>V</b> Via Lattea: <b><span id="vl">accesa</span></b> &middot; <b>T</b> tappeto: <b><span id="tap">acceso</span></b> &middot; <b>J</b> pianeti: <b><span id="pia">accesi</span></b> &middot; <b>O</b> cielo: <b><span id="buio">ciclo naturale</span></b> &middot; <b>G</b> andatura &middot; <b>spazio</b> pausa: <b><span id="gio">IN PAUSA (lento)</span></b><br>al centro dello sguardo: <b><span id="mirato">&mdash;</span></b> &middot; occhio sul suolo: <b><span id="suolo">—</span></b>
+ <input type="button" class="btn" value="&#128248; SCATTA RILIEVO (P)" onclick="scattaRilievo()" style="padding:2px 8px;font-size:11px;margin-left:6px">
+ <br>cielo calcolato: modello Vondr&aacute;k (valido &plusmn;200.000 anni) + moto proprio 3D &middot; posizioni <b>apparenti</b> (rifrazione Saemundsson) &middot; orizzonte dal rilievo &middot; <span id="cred"></span> <a href="index.html">&larr; torna a Precessio</a></div>
+<input type="button" id="vrbtn" class="btn" value="ENTRA IN VR" onclick="enterVR()" style="bottom:60px">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="catalogo.js"></script>
+<script>
+// ============ MOTORE (identico a Precessio v0.2) ============
+const AS2R=Math.PI/(180*3600), EPS0=84381.406*AS2R, D2R=Math.PI/180, R2D=180/Math.PI;
+const precVals=[[1/402.90,-22206.325946,1267.727824,-13765.924050,-3243.236469,-8571.476251,-2206.967126],
+[1/256.75,12236.649447,1702.324248,13511.858383,-3969.723769,5309.796459,-4186.752711],
+[1/292.00,-1589.008343,-2970.553839,-1455.229106,7099.207893,-610.393953,6737.949677],
+[1/537.22,2482.103195,693.790312,1054.394467,-1903.696711,923.201931,-856.922846],
+[1/241.45,150.322920,-14.724451,0,146.435014,3.759055,0],
+[1/375.22,-13.632066,-516.649401,-112.300144,1300.630106,-40.691114,957.149088],
+[1/157.87,389.437420,-356.794454,202.769908,1727.498039,80.437484,1709.440735],
+[1/274.20,2031.433792,-129.552058,1936.050095,299.854055,807.300668,154.425505],
+[1/203.00,363.748303,256.129314,0,-1217.125982,83.712326,0],
+[1/440.00,-896.747562,190.266114,-655.484214,-471.367487,-368.654854,-243.520976],
+[1/170.72,-926.995700,95.103991,-891.898637,-441.682145,-191.881064,-406.539008],
+[1/713.37,37.070667,-332.907067,0,-86.169171,-4.263770,0],
+[1/313.00,-597.682468,131.337633,0,-308.320429,-270.353691,0],
+[1/128.38,66.282812,82.731919,-333.322021,-422.815629,11.602861,-446.656435],
+[1/202.00,0,0,327.517465,0,0,-1049.071786],
+[1/315.00,0,0,-494.780332,0,0,-301.504189],
+[1/136.32,0,0,585.492621,0,0,41.348740],
+[1/490.00,0,0,110.512834,0,0,142.525186]];
+const pEps=[[1/409.90,-6908.287473,753.872780,-2845.175469,-1704.720302],
+[1/396.15,-3198.706291,-247.805823,449.844989,-862.308358],
+[1/537.22,1453.674527,379.471484,-1255.915323,447.832178],
+[1/402.90,-857.748557,-53.880558,886.736783,-889.571909],
+[1/417.15,1173.231614,-90.109153,418.887514,190.402846],
+[1/288.92,-156.981465,-353.600190,997.912441,-56.564991],
+[1/4043.0,371.836550,-63.115353,-240.979710,-296.222622],
+[1/306.00,-216.619040,-28.248187,76.541307,-75.859952],
+[1/277.00,193.691479,17.703387,-36.788069,67.473503],
+[1/203.00,11.891524,38.911307,-170.964086,3.014055]];
+function angles(T){const T2pi=T*2*Math.PI;let psi=0,ome=0,chi=0,eps=0;
+ for(const r of precVals){const p=T2pi*r[0],c=Math.cos(p),s=Math.sin(p);
+  psi+=r[1]*c+r[4]*s;ome+=r[2]*c+r[5]*s;chi+=r[3]*c+r[6]*s;}
+ for(const r of pEps){const p=T2pi*r[0],c=Math.cos(p),s=Math.sin(p);eps+=r[2]*c+r[4]*s;}
+ psi+=((289e-9*T-0.00740913)*T+5042.7980307)*T+8473.343527;
+ ome+=((151e-9*T+0.00000146)*T-0.4436568)*T+84283.175915;
+ chi+=((-61e-9*T+0.00001472)*T+0.0790159)*T-19.657270;
+ eps+=((-110e-9*T-0.00004039)*T+0.3624445)*T+84028.206305;
+ return [psi*AS2R,ome*AS2R,chi*AS2R,eps*AS2R];}
+function R1(a){const c=Math.cos(a),s=Math.sin(a);return [[1,0,0],[0,c,s],[0,-s,c]];}
+function R3(a){const c=Math.cos(a),s=Math.sin(a);return [[c,s,0],[-s,c,0],[0,0,1]];}
+function mm(A,B){const M=[[0,0,0],[0,0,0],[0,0,0]];
+ for(let i=0;i<3;i++)for(let j=0;j<3;j++)for(let k=0;k<3;k++)M[i][j]+=A[i][k]*B[k][j];return M;}
+function mv(A,v){return [A[0][0]*v[0]+A[0][1]*v[1]+A[0][2]*v[2],
+ A[1][0]*v[0]+A[1][1]*v[1]+A[1][2]*v[2],A[2][0]*v[0]+A[2][1]*v[1]+A[2][2]*v[2]];}
+function precMatrix(T){const [psi,ome,chi]=angles(T);
+ return mm(R3(chi),mm(R1(-ome),mm(R3(-psi),R1(EPS0))));}
+function vec(ra,dec){const r=ra*D2R,d=dec*D2R;
+ return [Math.cos(d)*Math.cos(r),Math.cos(d)*Math.sin(r),Math.sin(d)];}
+function radec(v){const n=Math.hypot(v[0],v[1],v[2]);
+ return [((Math.atan2(v[1],v[0])*R2D)+360)%360,Math.asin(v[2]/n)*R2D];}
+const CAT=[["Alnitak",85.18969,-1.94257,3.19,2.03,1.77,0,0],
+["Alnilam",84.05339,-1.20192,1.49,-1.06,1.69,0,0],
+["Mintaka",83.00167,-0.29910,0.64,-0.69,2.23,0,0],
+["Betelgeuse",88.79294,7.40706,27.54,11.30,0.45,0,0],
+["Rigel",78.63446,-8.20164,1.31,0.50,0.13,0,0],
+["Thuban",211.097292,64.375851,-56.34,17.21,3.67,0,0],
+["Bellatrix",81.28276,6.34970,-8.11,-12.88,1.64,0,0],
+["Saiph",86.93912,-9.66960,1.55,-1.20,2.07,0,0],
+["Sirio",101.28716,-16.71612,-546.01,-1223.07,-1.46,379.21,-5.5],
+["Procione",114.82550,5.22499,-714.59,-1036.80,0.37,284.56,-3.2],
+["Regolo",152.09296,11.96721,-249.40,4.91,1.36,41.13,5.9],
+["Denebola",177.26491,14.57206,-497.68,-114.67,2.14,90.91,-0.2],
+["Aldebaran",68.98016,16.50930,62.78,-189.36,0.87,48.94,54.3],
+["Alcyone (Pleiadi)",56.87117,24.10514,19.35,-43.11,2.87,0,0],
+["Canopo",95.98796,-52.69566,19.93,23.24,-0.72,0,0],
+["Capella",79.17232,45.99799,75.52,-427.11,0.08,76.20,29.9],
+["Deneb",310.35798,45.28034,1.99,1.95,1.25,0,0],
+["Vega",279.23473,38.78369,200.94,286.23,0.03,130.23,-13.9],
+["Spica",201.29824,-11.16132,-42.35,-30.67,0.97,0,0],
+["Antares",247.35192,-26.43200,-12.11,-23.30,1.06,0,0],
+["Arturo",213.91530,19.18241,-1093.45,-1999.40,-0.05,88.83,-5.2],
+["Fomalhaut",344.41269,-29.62224,328.95,-164.67,1.16,129.81,6.5],
+["Kochab",222.67636,74.15550,-32.61,11.42,2.08,0,0],
+["Polaris",37.95456,89.26411,44.48,-11.85,1.98,0,0],
+["Acrux (Croce Sud)",186.64956,-63.09909,-35.83,-14.86,0.76,0,0],
+["Mimosa (Croce Sud)",191.93029,-59.68877,-48.24,-12.82,1.25,0,0],
+["Achernar",24.42852,-57.23675,87.00,-38.24,0.46,0,0]];
+function starOfDate(s,year){
+ const ra=s[1],dec=s[2],pmra=s[3],pmdec=s[4],plx=s[6],rv=s[7];let raE,decE;
+ if(plx>0){const d=1000/plx,rr=vec(ra,dec),rar=ra*D2R,der=dec*D2R;
+  const p=[-Math.sin(rar),Math.cos(rar),0];
+  const q=[-Math.sin(der)*Math.cos(rar),-Math.sin(der)*Math.sin(rar),Math.cos(der)];
+  const k=AS2R/1000,dt=year-2000;
+  const vt=[(pmra*k*p[0]+pmdec*k*q[0])*d,(pmra*k*p[1]+pmdec*k*q[1])*d,(pmra*k*p[2]+pmdec*k*q[2])*d];
+  const vr=rv*1.0227e-6;
+  const pos=[rr[0]*d+(vt[0]+vr*rr[0])*dt,rr[1]*d+(vt[1]+vr*rr[1])*dt,rr[2]*d+(vt[2]+vr*rr[2])*dt];
+  [raE,decE]=radec(pos);
+ } else {const dt=year-2000;decE=dec+pmdec*dt/3.6e6;raE=ra+(pmra/Math.cos(dec*D2R))*dt/3.6e6;}
+ const T=(year-2000)/100;return radec(mv(precMatrix(T),vec(raE,decE)));}
+function altaz(ra,dec,lst,lat){
+ const H=(lst-ra)*D2R,d=dec*D2R,p=lat*D2R;
+ const alt=Math.asin(Math.sin(p)*Math.sin(d)+Math.cos(p)*Math.cos(d)*Math.cos(H));
+ const A=Math.atan2(-Math.cos(d)*Math.sin(H),Math.sin(d)*Math.cos(p)-Math.cos(d)*Math.sin(p)*Math.cos(H));
+ return [alt*R2D,((A*R2D)+360)%360];}
+
+// ============ SCENA 3D — OGGETTI PERSISTENTI + NASTRO ============
+const R=1800;
+let scene,camera,renderer,groundGroup,yaw=150,pitch=12;
+let stars={},lines=[],sun,playDir=0,playCur=0;
+let rig,controllers=[],vrHud=null,poleTxt='';
+let sunGlow=null,glowTex=null;
+let monuments=[],terreni=[],groundId=0,terrainSampler=null;
+let ultimoGiorno=0;   // ultima luce calcolata: serve ai terreni che arrivano in ritardo
+// true = si vedono le ricostruzioni da rilievo; false = solo il dato altimetrico grezzo
+let mostraRicostruzioni=true;
+function toggleRicostruzioni(){
+ mostraRicostruzioni=!mostraRicostruzioni;
+ applicaRicostruzioni();
+ const el=document.getElementById('modo');
+ if(el)el.textContent=mostraRicostruzioni?'dato + ricostruzione':'SOLO DATO GREZZO';
+}
+function applicaRicostruzioni(){
+ for(const m of monuments){
+  if(m.obj)m.obj.visible=mostraRicostruzioni;
+  if(m.edges)m.edges.visible=mostraRicostruzioni;
+  if(m.label)m.label.visible=m.cartello?true:mostraRicostruzioni;}
+}
+let discoBase=null;   // il fondo oltre i dati: va tenuto sotto la quota minima del rilievo
+let tappeto=null, mostraTappeto=true;
+function toggleTappeto(){
+ mostraTappeto=!mostraTappeto;
+ if(tappeto)tappeto.visible=mostraTappeto;
+ const el=document.getElementById('tap');
+ if(el)el.textContent=mostraTappeto?'acceso':'SPENTO';
+}
+let luceSole=null,luceCielo=null,luceDiffusa=null,ultimoAlt=-20,ultimoAz=90;
+let luna=null,luceLuna=null,faseLunaDisegnata=null,eclissi=null;
+let viaLattea=null,mostraViaLattea=true;
+let cieloGruppo=null;   // tutta la volta celeste sta qui dentro e segue l'osservatore
+let pianeti={}, mostraPianeti=true;
+// ============ TERRENO REALE — DEM SRTM + foto aerea ============
+function ll2tile(lat,lon,z){const n=Math.pow(2,z);
+ const x=(lon+180)/360*n;
+ const la=lat*D2R;
+ const y=(1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n;
+ return [x,y];}
+function loadTile(url,raw){
+ if(raw&&self.createImageBitmap){ // DEM: niente gestione colore, i byte devono restare intatti
+  return fetch(url,{mode:'cors'}).then(r=>r.blob())
+   .then(b=>createImageBitmap(b,{colorSpaceConversion:'none',premultiplyAlpha:'none'}));}
+ return new Promise((res,rej)=>{
+  const im=new Image();im.crossOrigin='anonymous';
+  im.onload=()=>res(im);im.onerror=rej;im.src=url;});}
+async function fetchGrid(z,cnt,urlFn,lat,lon,raw){
+ const [tx,ty]=ll2tile(lat,lon,z);
+ const cx=Math.floor(tx),cy=Math.floor(ty),h=(cnt-1)/2;
+ const cv=document.createElement('canvas');cv.width=cv.height=cnt*256;
+ const g=cv.getContext('2d',raw?{colorSpace:'srgb',willReadFrequently:true}:undefined);
+ if(raw)g.imageSmoothingEnabled=false;
+ const jobs=[];
+ for(let dx=-h;dx<=h;dx++)for(let dy=-h;dy<=h;dy++)
+  jobs.push(loadTile(urlFn(z,cx+dx,cy+dy),raw).then(im=>g.drawImage(im,(dx+h)*256,(dy+h)*256)));
+ await Promise.all(jobs);
+ return {cv,g,px0:(cx-h)*256,py0:(cy-h)*256,size:cnt*256};}
+const USA_DEM=new URLSearchParams(location.search).get('dem')==='1';
+async function buildTerrain(lat,lon,my,mlat,mlon){
+ try{
+  if(!USA_DEM){ // piana in piano: solo foto aerea drappeggiata (rilievo disattivato)
+   terrainSampler=()=>0;
+   await buildDrape(lat,lon,my,mlat,mlon,'terreno: piano (rilievo disattivato \u2014 aggiungi ?dem=1 per provarlo)');
+   return;}
+  const Zt=14;
+  const elev=await fetchGrid(Zt,3,(z,x,y)=>
+   'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/'+z+'/'+x+'/'+y+'.png',lat,lon,true);
+  if(my!==groundId)return;
+  const data=elev.g.getImageData(0,0,elev.size,elev.size,{colorSpace:'srgb'}).data,ES=elev.size;
+  const hRaw=(la,lo)=>{const t=ll2tile(la,lo,Zt);
+   let px=Math.round(t[0]*256-elev.px0),py=Math.round(t[1]*256-elev.py0);
+   px=Math.max(0,Math.min(ES-1,px));py=Math.max(0,Math.min(ES-1,py));
+   const i=(py*ES+px)*4;
+   if(data[i+3]===0)return null;               // pixel trasparente = dato mancante
+   const v=data[i]*256+data[i+1]+data[i+2]/256-32768;
+   return (isFinite(v)&&v>-500&&v<9000)?v:null;}; // fuori range = dato non valido
+  const h0=hRaw(lat,lon);
+  console.info('[DEM] sito',lat.toFixed(5),lon.toFixed(5),'-> tile z14',
+   Math.floor(ll2tile(lat,lon,Zt)[0]),Math.floor(ll2tile(lat,lon,Zt)[1]),
+   '| h0 =',h0,'m');
+  if(h0===null){console.warn('[DEM] h0 nullo: pixel trasparente o fuori range al sito stesso.');return;}
+  // controllo di plausibilita': dislivello su 2 km entro limiti ragionevoli
+  let mn=1e9,mx=-1e9,bad=0,tot=0,mnAt=null,mxAt=null;
+  for(let a=-1000;a<=1000;a+=100)for(let b=-1000;b<=1000;b+=100){
+   const v=hRaw(lat+b/mlat,lon+a/mlon);tot++;
+   if(v===null){bad++;continue;}
+   if(v<mn){mn=v;mnAt=[a,b];}
+   if(v>mx){mx=v;mxAt=[a,b];}}
+  const dislivello=mx-mn;
+  const demOK=(bad/tot<0.2)&&isFinite(dislivello)&&dislivello<400;
+  console.info('[DEM] dislivello su 2km:',Math.round(dislivello),'m  (min',Math.round(mn),'m a E/N',mnAt,
+   ' | max',Math.round(mx),'m a E/N',mxAt,') letture nulle:',bad+'/'+tot);
+  // il fondo scende sotto la valle piu' profonda, cosi' non affiora mai attraverso il terreno
+  // mn e' una quota ASSOLUTA sul livello del mare, la scena lavora in quote RELATIVE
+  // all'osservatore: senza sottrarre h0 il disco finirebbe sopra il terreno.
+  if(discoBase&&isFinite(mn))discoBase.position.y=Math.min(-0.6,(mn-h0)-8);
+  if(!demOK){ // rilievo inaffidabile: terreno piatto, ma foto aerea e monumenti restano
+   terrainSampler=()=>0;
+   console.warn('[DEM] SCARTATO (dislivello '+Math.round(dislivello)+' m, '+bad+'/'+tot+' letture nulle): terreno reso piano.');
+  }else{
+   terrainSampler=(e,n)=>{const v=hRaw(lat+n/mlat,lon+e/mlon);
+    return v===null?0:v-h0;};
+   console.info('[DEM] ACCETTATO: rilievo applicato.');}
+  setTimeout(diagnosticaDEM,120);
+  if(my===groundId){aggiornaQuota();calcolaOrizzonte();}   // terreno pronto: quota e orizzonte
+  // --- il DEM ha spalmato la massa dei monumenti sul terreno: la si toglie ---
+  // Per ciascun monumento si misura il banco roccioso su un anello esterno e si
+  // spiana l'impronta a quella quota, cosi' la ricostruzione non si somma al rigonfiamento.
+  const impronte=[];
+  for(const m of monuments){
+   if(!m.raggio)continue;
+   const q=quotaBanco(m.e,m.n,m.raggio*1.7);
+   m.quotaBanco=q;
+   if(!impronte.some(f=>f.e===m.e&&f.n===m.n))
+    impronte.push({e:m.e,n:m.n,r:m.raggio*1.15,rEst:m.raggio*1.75,q});}
+  if(impronte.length)console.info('[DEM] spianate',impronte.length,
+   'impronte di monumento; quote del banco:',impronte.map(f=>f.q.toFixed(1)+' m').join(', '));
+  const SIZE=3000,SEG=140;
+  const g=new THREE.PlaneGeometry(SIZE,SIZE,SEG,SEG);
+  g.rotateX(-Math.PI/2);
+  const pos=g.attributes.position;
+  for(let i=0;i<pos.count;i++){
+   const e=pos.getX(i),n=-pos.getZ(i);
+   let y=terrainSampler(e,n);
+   for(const f of impronte){          // toglie il rigonfiamento sotto i monumenti
+    const dm=Math.hypot(e-f.e,n-f.n);
+    if(dm>=f.rEst)continue;
+    const peso=dm<=f.r?1:1-(dm-f.r)/(f.rEst-f.r);
+    y=y*(1-peso)+f.q*peso;}
+   const d=Math.hypot(e,n);
+   if(d>1150)y*=Math.max(0,1-(d-1150)/330); // raccordo che si chiude PRIMA del bordo (1480 < 1500)
+   pos.setY(i,y);}
+  g.computeVertexNormals();   // senza questo le pendenze non catturano la luce
+  let mat=new THREE.MeshLambertMaterial({map:makeGroundTex(),side:THREE.DoubleSide});
+  let cred='rilievo: NASA SRTM (AWS Terrain Tiles)';
+  try{
+   const Zi=16;
+   const img=await fetchGrid(Zi,7,(z,x,y)=>
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+'.png',lat,lon);
+   if(my!==groundId)return;
+   const uv=g.attributes.uv;
+   for(let i=0;i<pos.count;i++){
+    const e=pos.getX(i),n=-pos.getZ(i);
+    const t=ll2tile(lat+n/mlat,lon+e/mlon,Zi);
+    uv.setXY(i,(t[0]*256-img.px0)/img.size,1-(t[1]*256-img.py0)/img.size);}
+   uv.needsUpdate=true;
+   const tex=new THREE.CanvasTexture(img.cv);tex.anisotropy=4;
+   mat=new THREE.MeshLambertMaterial({map:tex,side:THREE.DoubleSide});
+   cred+=' \u00b7 foto aerea: Esri World Imagery';
+   // tappeto ad alta risoluzione (z18, ~0.5 m/px) sul km centrale
+   try{
+    const Zh=18;
+    const hi=await fetchGrid(Zh,9,(z,x,y)=>
+     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+'.png',lat,lon);
+    if(my!==groundId)return;
+    const S2=1000,SEG2=100;
+    const g2=new THREE.PlaneGeometry(S2,S2,SEG2,SEG2);
+    g2.rotateX(-Math.PI/2);
+    const p2=g2.attributes.position,uv2=g2.attributes.uv;
+    for(let i=0;i<p2.count;i++){
+     const e=p2.getX(i),n=-p2.getZ(i);
+     p2.setY(i,terrainSampler(e,n)+0.15);
+     const t=ll2tile(lat+n/mlat,lon+e/mlon,Zh);
+     uv2.setXY(i,(t[0]*256-hi.px0)/hi.size,1-(t[1]*256-hi.py0)/hi.size);}
+    uv2.needsUpdate=true;g2.computeVertexNormals();
+    const t2=new THREE.CanvasTexture(hi.cv);t2.anisotropy=4;
+    {const m2=new THREE.Mesh(g2,new THREE.MeshLambertMaterial({map:t2,side:THREE.DoubleSide}));
+     m2.name='TAPPETO';m2.visible=mostraTappeto;tappeto=m2;groundGroup.add(m2);terreni.push(m2);}
+   }catch(e){}
+  }catch(e){}
+  const terrain=new THREE.Mesh(g,mat);terrain.name='TERRENO';
+  groundGroup.add(terrain);terreni.push(terrain);
+  snapMonuments();
+  document.getElementById('cred').textContent=cred+' \u00b7 ';
+ }catch(e){/* offline o tile mancanti: resta la sabbia procedurale */}
+}
+async function buildDrape(lat,lon,my,mlat,mlon,nota){
+ const S=2600,SEG=64;
+ const g=new THREE.PlaneGeometry(S,S,SEG,SEG);g.rotateX(-Math.PI/2);
+ const pos=g.attributes.position;
+ for(let i=0;i<pos.count;i++)pos.setY(i,0.05);
+ let mat=new THREE.MeshLambertMaterial({map:makeGroundTex(),side:THREE.DoubleSide});
+ let cred=nota;
+ try{
+  const Zi=16;
+  const img=await fetchGrid(Zi,7,(z,x,y)=>
+   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+'.png',lat,lon);
+  if(my!==groundId)return;
+  const uv=g.attributes.uv;
+  for(let i=0;i<pos.count;i++){
+   const e=pos.getX(i),n=-pos.getZ(i);
+   const t=ll2tile(lat+n/mlat,lon+e/mlon,Zi);
+   uv.setXY(i,(t[0]*256-img.px0)/img.size,1-(t[1]*256-img.py0)/img.size);}
+  uv.needsUpdate=true;
+  const tex=new THREE.CanvasTexture(img.cv);tex.anisotropy=4;
+  mat=new THREE.MeshLambertMaterial({map:tex,side:THREE.DoubleSide});
+  cred+=' \u00b7 foto aerea: Esri World Imagery';
+  try{ // tappeto ad alta risoluzione sul km centrale
+   const Zh=18;
+   const hi=await fetchGrid(Zh,9,(z,x,y)=>
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x+'.png',lat,lon);
+   if(my!==groundId)return;
+   const g2=new THREE.PlaneGeometry(1000,1000,60,60);g2.rotateX(-Math.PI/2);
+   const p2=g2.attributes.position,uv2=g2.attributes.uv;
+   for(let i=0;i<p2.count;i++){
+    const e=p2.getX(i),n=-p2.getZ(i);
+    p2.setY(i,0.2);
+    const t=ll2tile(lat+n/mlat,lon+e/mlon,Zh);
+    uv2.setXY(i,(t[0]*256-hi.px0)/hi.size,1-(t[1]*256-hi.py0)/hi.size);}
+   uv2.needsUpdate=true;
+   const t2=new THREE.CanvasTexture(hi.cv);t2.anisotropy=4;
+   {const m2=new THREE.Mesh(g2,new THREE.MeshLambertMaterial({map:t2,side:THREE.DoubleSide}));
+     m2.name='TAPPETO';m2.visible=mostraTappeto;tappeto=m2;groundGroup.add(m2);terreni.push(m2);}
+  }catch(e){}
+ }catch(e){}
+ {const mp=new THREE.Mesh(g,mat);groundGroup.add(mp);terreni.push(mp);}
+ snapMonuments();
+ document.getElementById('cred').textContent=cred+' \u00b7 ';
+}
+// Interroga il DEM nei punti misurati da ADE 444 e riporta quanto svetta ogni monumento
+// rispetto al terreno circostante. Serve a decidere sui DATI, non sulle impressioni.
+function diagnosticaDEM(){
+ if(!terrainSampler){console.warn('[DEM] rilievo non attivo: aggiungi ?dem=1');return;}
+ const p=document.getElementById('site').value.split(',');
+ const lat=parseFloat(p[0]),lon=parseFloat(p[1]);
+ const sito=trovaSito(lat,lon);
+ if(!sito){console.warn('[DEM] nessun sito nel catalogo');return;}
+ const mlat=110861,mlon=111320*Math.cos(lat*D2R);
+ console.log('%c[DEM] quanto svettano i monumenti DENTRO i dati altimetrici','font-weight:bold');
+ console.log('    (h centro = quota al centro; anello = media a una semibase di distanza; rilievo = differenza)');
+ for(const el of sito.elementi){
+  if(!el.attivo||el.tipo!=='piramide')continue;
+  const e=(el.lon-lon)*mlon, n=(el.lat-lat)*mlat;
+  const hC=terrainSampler(e,n);
+  let somma=0,cnt=0;
+  const r=el.base;                       // anello a una base di distanza: terreno "fuori" dal monumento
+  for(let a=0;a<360;a+=30){
+   const rad=a*D2R;
+   somma+=terrainSampler(e+r*Math.sin(rad),n+r*Math.cos(rad));cnt++;}
+  const anello=somma/cnt, rilievo=hC-anello;
+  const atteso=el.altezza;
+  console.log('   '+el.nome.padEnd(10)+
+   ' h centro '+hC.toFixed(1).padStart(7)+' m   anello '+anello.toFixed(1).padStart(7)+
+   ' m   -> rilievo nei dati '+rilievo.toFixed(1).padStart(6)+' m   (altezza reale '+atteso+' m,'+
+   ' cioe\' il '+Math.round(100*rilievo/atteso)+'%)');
+ }
+ console.log('    Se il rilievo nei dati e\' molto minore dell\'altezza reale, la piramide NON e\' nel DEM');
+}
+// La quota vera su cui poggia il monumento: media del terreno su un anello
+// esterno al suo ingombro, dove il DEM non e' contaminato dalla massa costruita.
+function quotaBanco(e,n,raggio){
+ let s=0,c=0;
+ for(let a=0;a<360;a+=15){
+  const r=a*D2R;
+  const v=terrainSampler(e+raggio*Math.sin(r),n+raggio*Math.cos(r));
+  if(isFinite(v)){s+=v;c++;}}
+ return c?s/c:0;
+}
+function snapMonuments(){
+ if(!terrainSampler)return;
+ for(const m of monuments){
+  const fuoriDati=Math.hypot(m.e,m.n)>1450;      // oltre il piano del rilievo non c'e' quota misurata
+  let y=fuoriDati ? (discoBase?discoBase.position.y+0.5:0)
+                  : ((m.quotaBanco!==undefined)?m.quotaBanco:terrainSampler(m.e,m.n));
+  if(!isFinite(y)||y<-300||y>800)y=0;  // rete di sicurezza: quota sospetta = quota del sito
+  if(m.obj)m.obj.position.y=y+m.lift;
+  if(m.edges)m.edges.position.y=y+(m.spigoliLift!==undefined?m.spigoliLift:m.lift);
+  if(m.label)m.label.position.y=y+m.labelLift;}
+ tintaMonumenti(ultimoGiorno);}
+// ============ AMBIENTE — realismo v1 ============
+// ============ IL SOLE — posizione calcolata, non decorativa ============
+function obliquita(year){
+ // Laskar 1986: valido entro +/-10.000 anni da J2000, precisione ottima nel raggio archeologico
+ const t=(year-2000)/10000;
+ if(Math.abs(t)<=1){
+  return 23.439291111
+   -1.300258333*t -0.000430556*Math.pow(t,2) +0.555347222*Math.pow(t,3)
+   -0.014272222*Math.pow(t,4) -0.069352778*Math.pow(t,5) -0.010847222*Math.pow(t,6)
+   +0.001977778*Math.pow(t,7) +0.007741667*Math.pow(t,8) +0.001608333*Math.pow(t,9)
+   +0.000680556*Math.pow(t,10);}
+ // oltre i 10.000 anni il polinomio diverge: si usa l'oscillazione reale (~41.000 anni),
+ // ancorata al massimo di ~8700 a.C. — APPROSSIMATA, dichiararlo se usata nel libro
+ return 23.415+0.815*Math.cos(2*Math.PI*(year+8700)/41000);
+}
+function soleRaDec(lambda,year){
+ // dalla longitudine eclittica (0 equinozio di primavera, 90 solstizio d'estate...)
+ const e=obliquita(year)*D2R, l=lambda*D2R;
+ const dec=Math.asin(Math.sin(e)*Math.sin(l))*R2D;
+ const ra=((Math.atan2(Math.cos(e)*Math.sin(l),Math.cos(l))*R2D)+360)%360;
+ return [ra,dec];
+}
+// ============ I PIANETI ============
+// Elementi kepleriani medi J2000 con derive per secolo (JPL, Standish).
+// [a, e, i, L, lungPeri, nodo] e le rispettive derive.
+// ONESTA': la struttura e' esatta (orbite vere, geocentrico vero, precessione vera), ma la
+// FASE orbitale diventa indeterminata su decine di migliaia di anni. La fascia zodiacale
+// entro cui si muovono resta invece corretta sempre.
+const PIANETI={
+ Mercurio:{el:[0.38709927,0.20563593,7.00497902,252.25032350,77.45779628,48.33076593],
+  d:[0.00000037,0.00001906,-0.00594749,149472.67411175,0.16047689,-0.12534081],
+  col:0xc8c3b8,r:5},
+ Venere:{el:[0.72333566,0.00677672,3.39467605,181.97909950,131.60246718,76.67984255],
+  d:[0.00000390,-0.00004107,-0.00078890,58517.81538729,0.00268329,-0.27769418],
+  col:0xfff2cf,r:9},
+ Marte:{el:[1.52371034,0.09339410,1.84969142,-4.55343205,-23.94362959,49.55953891],
+  d:[0.00001847,0.00007882,-0.00813131,19140.30268499,0.44441088,-0.29257343],
+  col:0xd97a4a,r:6},
+ Giove:{el:[5.20288700,0.04838624,1.30439695,34.39644051,14.72847983,100.47390909],
+  d:[-0.00011607,-0.00013253,-0.00183714,3034.74612775,0.21252668,0.20469106],
+  col:0xe8dcc0,r:8},
+ Saturno:{el:[9.53667594,0.05386179,2.48599187,49.95424423,92.59887831,113.66242448],
+  d:[-0.00125060,-0.00050991,0.00193609,1222.49362201,-0.41897216,-0.28867794],
+  col:0xd8c58a,r:7}};
+const TERRA={el:[1.00000261,0.01671123,-0.00001531,100.46457166,102.93768193,0.0],
+  d:[0.00000562,-0.00004392,-0.01294668,35999.37244981,0.32327364,0.0]};
+// giorni da J2000 corrispondenti a quell'anno e a quella stagione
+function giorniDa(year,lambdaSole){
+ const d0=(year-2000)*365.25;
+ const L0=(((280.460+0.9856474*d0)%360)+360)%360;
+ return d0+((((lambdaSole-L0)%360)+360)%360)/0.9856474;
+}
+// posizione eliocentrica sull'eclittica J2000
+function orbita(p,T){
+ const a=p.el[0]+p.d[0]*T, e=p.el[1]+p.d[1]*T, i=(p.el[2]+p.d[2]*T)*D2R;
+ const L=p.el[3]+p.d[3]*T, w=p.el[4]+p.d[4]*T, O=(p.el[5]+p.d[5]*T)*D2R;
+ let M=((L-w)%360+540)%360-180; M*=D2R;
+ let E=M; for(let k=0;k<8;k++)E=E-(E-e*Math.sin(E)-M)/(1-e*Math.cos(E));
+ const xp=a*(Math.cos(E)-e), yp=a*Math.sqrt(Math.max(0,1-e*e))*Math.sin(E);
+ const om=(w-p.el[5]-p.d[5]*T)*D2R;
+ const co=Math.cos(om),so=Math.sin(om),cO=Math.cos(O),sO=Math.sin(O),ci=Math.cos(i),si=Math.sin(i);
+ return [ (co*cO-so*sO*ci)*xp + (-so*cO-co*sO*ci)*yp,
+          (co*sO+so*cO*ci)*xp + (-so*sO+co*cO*ci)*yp,
+          (so*si)*xp + (co*si)*yp ];
+}
+// dal geocentrico eclittico J2000 all'equatoriale dell'epoca
+function pianetaRaDec(nome,year,lambdaSole){
+ const T=giorniDa(year,lambdaSole)/36525;
+ const p=orbita(PIANETI[nome],T), t=orbita(TERRA,T);
+ const g=[p[0]-t[0],p[1]-t[1],p[2]-t[2]];
+ const eps=23.439291111*D2R;
+ const q=[g[0], g[1]*Math.cos(eps)-g[2]*Math.sin(eps), g[1]*Math.sin(eps)+g[2]*Math.cos(eps)];
+ const n=Math.hypot(q[0],q[1],q[2])||1;
+ const v=mv(precMatrix((year-2000)/100),[q[0]/n,q[1]/n,q[2]/n]);
+ return radec(v);
+}
+// ============ LA VIA LATTEA ============
+// Il piano galattico e' una direzione DEFINITA: polo nord galattico AR 192,85948 Dec +27,12825,
+// longitudine galattica del polo nord celeste 122,93192 (IAU). Precessarlo e' la stessa
+// matematica delle stelle: la banda si inclina da se' scorrendo i millenni, niente da inventare.
+const RA_PG=192.85948, DEC_PG=27.12825, L_PNC=122.93192;
+function gal2eq(l,b){
+ const lr=(L_PNC-l)*D2R, br=b*D2R, dp=DEC_PG*D2R;
+ const dec=Math.asin(Math.sin(dp)*Math.sin(br)+Math.cos(dp)*Math.cos(br)*Math.cos(lr));
+ const y=Math.cos(br)*Math.sin(lr);
+ const x=Math.cos(dp)*Math.sin(br)-Math.sin(dp)*Math.cos(br)*Math.cos(lr);
+ return [((Math.atan2(y,x)*R2D)+RA_PG+360)%360, dec*R2D];
+}
+// matrice che porta un vettore equatoriale J2000 nelle coordinate della scena:
+// precessione fino all'epoca, poi rotazione all'orizzonte del luogo (est, alto, sud)
+// ============ SPOSTAMENTO PARAMETRICO DELL'ASSE CELESTE ============
+// Non serve a FAR COMBACIARE le cose: serve a MISURARE quanto costerebbe farle combaciare.
+// Si sposta il polo celeste rispetto alla crosta di un angolo dato in una direzione data,
+// e il programma riporta il prezzo geofisico di quello spostamento.
+let asseTilt=0, asseDir=0, MAT_ASSE=null;
+// Buio permanente: il cielo resta notturno qualunque sia la posizione del Sole.
+// NON e' fisica, e' un aiuto all'osservazione — serve a vedere DOVE stanno gli astri
+// anche a mezzogiorno, quando la luce del giorno li cancellerebbe.
+let buioSempre=false;
+// ============ SORGERE ELIACO ============
+// La prima riapparizione di una stella all'alba dopo il periodo di invisibilita'.
+// Per Sirio era il capodanno egizio. Dipende dall'ARCO DI VISIONE: quanto il Sole deve
+// stare sotto l'orizzonte perche' la stella emerga dal chiarore. Per Sirio la letteratura
+// classica usa 8-10 gradi; qui 9. Con arco diverso la data cambia di qualche giorno.
+const ARCO_VISIONE=9.0, ALT_MINIMA=0.5;
+function condizioneEliaca(nome,lamSole,year,lat){
+ const [raS,decS]=soleRaDec(lamSole,year);
+ const st=CAT.find(s=>s[0]===nome); if(!st)return null;
+ const [ra,dec]=starOfDate(st,year);
+ const c=(Math.sin(-ARCO_VISIONE*D2R)-Math.sin(lat*D2R)*Math.sin(decS*D2R))/(Math.cos(lat*D2R)*Math.cos(decS*D2R));
+ if(c<-1||c>1)return null;
+ const lst=((raS-Math.acos(c)*R2D)%360+360)%360;
+ const a=altaz(ra,dec,lst,lat);
+ return {alt:altApparente(a[0]), az:a[1], lst};
+}
+function sorgereEliaco(nome,year,lat){
+ let prec=null;
+ for(let lam=0;lam<720;lam+=0.2){
+  const r=condizioneEliaca(nome,lam%360,year,lat);
+  if(!r){prec=null;continue;}
+  if(prec&&prec.alt<ALT_MINIMA&&r.alt>=ALT_MINIMA){
+   let lo=lam-0.2,hi=lam;
+   for(let k=0;k<40;k++){const m=(lo+hi)/2;
+    if(condizioneEliaca(nome,m%360,year,lat).alt<ALT_MINIMA)lo=m;else hi=m;}
+   const lam2=((lo+hi)/2)%360, f=condizioneEliaca(nome,lam2,year,lat);
+   return {lam:lam2, az:f.az, lst:f.lst};}
+  prec=r;}
+ return null;
+}
+// Le finestre dell'anno in cui l'eclissi e' possibile, per l'epoca corrente
+function trovaStagioniEclissi(){
+ const year=parseFloat(document.getElementById('year').value);
+ const st=stagioniEclissi(year);
+ const el=document.getElementById('prezzo'); el.style.display='block';
+ if(!st.length){el.innerHTML='in questa configurazione dei nodi nessuna finestra di eclissi';return;}
+ const righe=st.map(s=>{
+  const gg=((s.da+s.a)/2)/0.9856474;
+  return (s.tipo==='solare'?'\u2600 solare':'\u263e lunare')+': Sole fra <b>'+s.da.toFixed(0)+
+   '\u00b0</b> e <b>'+s.a.toFixed(0)+'\u00b0</b> di longitudine (centro a '+gg.toFixed(0)+
+   ' giorni dall\'equinozio)';});
+ el.innerHTML='<b>FINESTRE DI ECLISSI</b> per l\'epoca scelta<br>'+righe.join('<br>')+
+  '<br><span style="font-size:10px;color:#b09a6a">dice QUANDO erano possibili, non in che giorno '+
+  'accaddero n\u00e9 da dove furono visibili: servirebbero teoria lunare completa, geometria '+
+  'dell\'ombra e il \u0394T della rotazione terrestre</span>';
+}
+function vaiAlSorgereEliaco(){
+ const year=parseFloat(document.getElementById('year').value);
+ const lat=parseFloat(document.getElementById('site').value.split(',')[0]);
+ const r=sorgereEliaco('Sirio',year,lat);
+ const el=document.getElementById('prezzo');
+ el.style.display='block';
+ if(!r){el.innerHTML='in questa epoca e a questa latitudine Sirio non ha sorgere eliaco';return;}
+ const gg=r.lam/0.9856474;
+ let dal='';
+ const d=r.lam-90;                                  // scarto dal solstizio d'estate
+ if(Math.abs(d)<3)dal=' &mdash; <b>coincide col solstizio d\'estate</b>';
+ else dal=' &mdash; '+Math.abs(d/0.9856474).toFixed(0)+' giorni '+(d>0?'dopo':'prima')+' del solstizio d\'estate';
+ el.innerHTML='<b>SORGERE ELIACO DI SIRIO</b> &middot; longitudine del Sole <b>'+r.lam.toFixed(1)+
+  '\u00b0</b> ('+gg.toFixed(0)+' giorni dopo l\'equinozio di primavera)'+dal+
+  '<br>azimut di levata <b>'+r.az.toFixed(1)+'\u00b0</b> &middot; arco di visione 9\u00b0';
+ // porta la scena a quel momento
+ const st=document.getElementById('stagione');
+ let vicino=0,dmin=1e9;
+ for(const o of st.options){const v=parseFloat(o.value);
+  let dd=Math.abs(((r.lam-v)%360+540)%360-180); if(dd<dmin){dmin=dd;vicino=v;}}
+ st.value=String(vicino);
+ document.getElementById('scene').value='free';
+ document.getElementById('lstbox').style.display='block';
+ document.getElementById('lst').value=Math.round(r.lst);
+ update();
+}
+// ============ IL GIORNO CHE SCORRE ============
+// Il Sole non e' una posizione, e' un passaggio: nasce, attraversa, muore, rinasce.
+// Facendo avanzare il tempo siderale ruota TUTTO il cielo insieme, come nella realta'.
+const VELOCITA_GIORNO=[0, 3.0, 9.0, 30.0];   // gradi di cielo al secondo: fermo, lento, medio, rapido
+const NOMI_GIORNO=['fermo','lento','medio','rapido'];
+let cicloGiorno=0, andaturaMemoria=1;   // memoria dell'andatura, per riprendere dov'eri
+function orologioLibero(){
+ document.getElementById('scene').value='free';
+ document.getElementById('lstbox').style.display='block';
+}
+function mostraGiorno(){
+ const el=document.getElementById('gio');
+ if(el)el.textContent=(cicloGiorno===0)
+   ? 'IN PAUSA ('+NOMI_GIORNO[andaturaMemoria]+')'
+   : NOMI_GIORNO[cicloGiorno];
+}
+// G: cambia andatura (e riparte, se era fermo)
+function cicloGiornoAvanti(){
+ andaturaMemoria=andaturaMemoria%(VELOCITA_GIORNO.length-1)+1;   // lento, medio, rapido
+ cicloGiorno=andaturaMemoria;
+ orologioLibero();mostraGiorno();update();
+}
+// SPAZIO: ferma e riprende senza perdere l'andatura ne' l'istante
+function pausaGiorno(){
+ if(cicloGiorno!==0){andaturaMemoria=cicloGiorno;cicloGiorno=0;}
+ else{cicloGiorno=andaturaMemoria;orologioLibero();}
+ mostraGiorno();update();
+}
+function avanzaGiorno(dt){
+ if(!cicloGiorno||!dt)return;
+ const s=document.getElementById('lst');
+ let v=parseFloat(s.value)+VELOCITA_GIORNO[cicloGiorno]*dt;
+ s.value=((v%360)+360)%360;
+ update();
+}
+// l'ora solare vera: si ricava dall'angolo orario del Sole
+function oraSolare(lst,raSole){
+ const H=(((lst-raSole)%360)+360)%360;
+ const h=((H/15)+12)%24;
+ const m=Math.round((h%1)*60);
+ return String(Math.floor(h)).padStart(2,'0')+':'+String(m===60?0:m).padStart(2,'0');
+}
+function toggleBuio(){
+ buioSempre=!buioSempre;
+ const el=document.getElementById('buio');
+ if(el)el.textContent=buioSempre?'BUIO FISSO':'ciclo naturale';
+ update();
+}
+function costruisciMatriceAsse(){
+ if(!asseTilt){MAT_ASSE=null;return;}
+ const t=asseTilt*D2R, d=asseDir*D2R;
+ // rotazione di 't' attorno all'asse perpendicolare alla direzione 'd' nel piano equatoriale
+ const nx=-Math.sin(d), ny=Math.cos(d), nz=0;
+ const c=Math.cos(t), s=Math.sin(t), C=1-c;
+ MAT_ASSE=[[c+nx*nx*C, nx*ny*C-nz*s, nx*nz*C+ny*s],
+           [ny*nx*C+nz*s, c+ny*ny*C, ny*nz*C-nx*s],
+           [nz*nx*C-ny*s, nz*ny*C+nx*s, c+nz*nz*C]];
+}
+function conAsse(ra,dec){
+ if(!MAT_ASSE)return [ra,dec];
+ return radec(mv(MAT_ASSE,vec(ra,dec)));
+}
+// il prezzo dello spostamento, in termini che si possono confrontare con la geofisica
+function prezzoAsse(){
+ const km=asseTilt*111.19;                       // 1 grado di crosta = 111,19 km
+ const myr=asseTilt/1.0;                         // deriva polare vera documentata: ~1 grado per milione di anni
+ return {gradi:asseTilt, km, myr};
+}
+// MISURA DEL COSTO: qual e' lo spostamento MINIMO dell'asse che fa cadere la Cintura
+// sulle tre punte, da dove ti trovi e nell'epoca scelta? Il programma lo cerca e lo dichiara.
+// Non conferma l'ipotesi: ne calcola il prezzo, che poi si confronta con la geofisica.
+function misuraCosto(){
+ const el=document.getElementById('prezzo');
+ el.style.display='block';
+ el.innerHTML='calcolo in corso\u2026';
+ setTimeout(()=>{
+  const bers=[];
+  for(const nome of ['Cheope','Chefren','Micerino']){
+   const m=monuments.find(x=>x.nomeVisibile===nome&&x.spigoliLift!==undefined);
+   if(!m){el.innerHTML='servono le tre piramidi in scena (sito Giza)';return;}
+   const dx=m.e-rig.position.x, dz=(-m.n)-rig.position.z, d=Math.hypot(dx,dz);
+   const apice=m.obj.position.y+m.spigoliLift*2;
+   bers.push({az:(((Math.atan2(dx,-dz)*R2D))+360)%360,
+              alt:Math.atan2(apice-(rig.position.y+1.7),d)*R2D});}
+  const year=parseFloat(document.getElementById('year').value);
+  const lat=parseFloat(document.getElementById('site').value.split(',')[0]);
+  const base=['Alnitak','Alnilam','Mintaka'].map(n=>starOfDate(CAT.find(s=>s[0]===n),year));
+  function scarto(tilt,dir,lst){
+   let M=null;
+   if(tilt){const t=tilt*D2R,dd=dir*D2R,nx=-Math.sin(dd),ny=Math.cos(dd);
+    const c=Math.cos(t),s=Math.sin(t),C=1-c;
+    M=[[c+nx*nx*C,nx*ny*C,ny*s],[ny*nx*C,c+ny*ny*C,-nx*s],[-ny*s,nx*s,c]];}
+   let e=0;
+   for(let i=0;i<3;i++){
+    let rd=base[i];
+    if(M)rd=radec(mv(M,vec(rd[0],rd[1])));
+    const p=altaz(rd[0],rd[1],lst,lat);
+    let da=p[1]-bers[i].az; if(da>180)da-=360; if(da<-180)da+=360;
+    e=Math.max(e,Math.hypot(da*Math.cos(p[0]*D2R),p[0]-bers[i].alt));}
+   return e;}
+  let best={e:1e9};
+  for(let tilt=0;tilt<=45;tilt+=1)for(let dir=0;dir<360;dir+=6)for(let lst=0;lst<360;lst+=2){
+   const e=scarto(tilt,dir,lst);
+   if(e<best.e)best={e,tilt,dir,lst};}
+  for(let tilt=Math.max(0,best.tilt-1.5);tilt<=best.tilt+1.5;tilt+=0.1)
+   for(let dir=best.dir-8;dir<=best.dir+8;dir+=0.5)
+    for(let lst=best.lst-3;lst<=best.lst+3;lst+=0.15){
+     const e=scarto(tilt,((dir%360)+360)%360,((lst%360)+360)%360);
+     if(e<best.e)best={e,tilt,dir:((dir%360)+360)%360,lst:((lst%360)+360)%360};}
+  const km=Math.round(best.tilt*111.19), myr=best.tilt/1.0;
+  el.innerHTML='<b>COSTO DELL\'IPOTESI</b> nell\'epoca scelta: servirebbe uno spostamento del polo di '+
+   '<b>'+best.tilt.toFixed(2)+'\u00b0</b> (direzione '+Math.round(best.dir)+'\u00b0) = <b>'+km+' km</b> di crosta'+
+   ' &middot; residuo <b>'+best.e.toFixed(2)+'\u00b0</b>'+
+   '<br>alla deriva polare documentata (~1\u00b0 per milione di anni) servirebbero <b>'+myr.toFixed(1)+
+   ' milioni di anni</b>'+(best.tilt>5?' &mdash; <b style="color:#e08a5a">oltre ogni evidenza paleomagnetica nota</b>':
+   (best.tilt<1?' &mdash; entro il plausibile':''));
+  document.getElementById('asseT').value=best.tilt.toFixed(2);
+  document.getElementById('asseD').value=Math.round(best.dir);
+  document.getElementById('asseTv').textContent=best.tilt.toFixed(2);
+  document.getElementById('asseDv').textContent=Math.round(best.dir);
+  asseTilt=best.tilt;asseDir=best.dir;costruisciMatriceAsse();
+  document.getElementById('lst').value=Math.round(best.lst);
+  document.getElementById('scene').value='free';
+  document.getElementById('lstbox').style.display='block';
+  update();
+ },40);
+}
+function aggiornaAsse(){
+ asseTilt=parseFloat(document.getElementById('asseT').value)||0;
+ asseDir=parseFloat(document.getElementById('asseD').value)||0;
+ costruisciMatriceAsse();
+ const p=prezzoAsse();
+ const el=document.getElementById('prezzo');
+ if(el)el.style.display = asseTilt===0 ? 'none' : 'block';
+ if(el)el.innerHTML = asseTilt===0
+  ? 'asse nella posizione calcolata (nessuno spostamento imposto)'
+  : '<b>'+p.gradi.toFixed(2)+'\u00b0</b> di spostamento del polo = <b>'+Math.round(p.km)+
+    ' km</b> di crosta &middot; alla deriva polare documentata (~1\u00b0 per milione di anni) '+
+    'servirebbero <b>'+p.myr.toFixed(1)+' milioni di anni</b>'+
+    (p.gradi>5?' &mdash; <b style="color:#e08a5a">oltre ogni evidenza paleomagnetica nota</b>':'');
+ update();
+}
+function matriceCielo(year,lst,lat){
+ let P=precMatrix((year-2000)/100);
+ if(MAT_ASSE)P=mm(MAT_ASSE,P);
+ const M=[vec(lst+90,0), vec(lst,lat), vec(lst,lat-90)];
+ const C=[[0,0,0],[0,0,0],[0,0,0]];
+ for(let i=0;i<3;i++)for(let j=0;j<3;j++)
+  C[i][j]=M[i][0]*P[0][j]+M[i][1]*P[1][j]+M[i][2]*P[2][j];
+ return C;
+}
+// La banda: geometria costruita una volta sola in coordinate J2000, poi ruotata dalla matrice.
+// Posizione e orientamento sono esatti; la LUMINOSITA' e' un modello liscio (piu' brillante
+// verso il centro galattico, piu' stretta verso l'anticentro), non una mappa fotometrica.
+function costruisciViaLattea(){
+ const NL=144,NB=13,BMAX=17,Rv=R+20;   // dietro le stelle, dentro la volta celeste
+ const pos=[],col=[],idx=[];
+ for(let i=0;i<=NL;i++){
+  const l=(i/NL)*360, versoCentro=(Math.cos(l*D2R)+1)/2;
+  for(let j=0;j<NB;j++){
+   const b=-BMAX+(j/(NB-1))*2*BMAX;
+   const [ra,dec]=gal2eq(l,b), v=vec(ra,dec);
+   pos.push(v[0]*Rv,v[1]*Rv,v[2]*Rv);
+   const larghezza=0.55+0.45*versoCentro;
+   const t=Math.abs(b)/(BMAX*larghezza);
+   const lum=(0.18+0.52*versoCentro)*Math.exp(-t*t*2.4);
+   col.push(lum,lum*0.97,lum*0.90);
+  }}
+ for(let i=0;i<NL;i++)for(let j=0;j<NB-1;j++){
+  const a=i*NB+j,c=(i+1)*NB+j;
+  idx.push(a,c,c+1, a,c+1,a+1);}
+ const g=new THREE.BufferGeometry();
+ g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+ g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+ g.setIndex(idx);
+ return g;
+}
+// ============ LA LUNA ============
+// La fase E' l'elongazione dal Sole: nuova 0, primo quarto 90, piena 180, ultimo quarto 270.
+// Cosi' si ragiona come in archeoastronomia ("il plenilunio piu' vicino al solstizio")
+// senza bisogno di una data del calendario.
+const INCL_LUNARE=5.145;                  // inclinazione dell'orbita lunare sull'eclittica
+function nodoLunare(year){                // longitudine del nodo ascendente: regredisce in 18,61 anni
+ const T=(year-2000)/100;
+ return ((125.04452-1934.136261*T)%360+360)%360;
+}
+function lunaRaDec(lambdaSole,elong,year){
+ const lam=lambdaSole+elong;                                   // longitudine eclittica della Luna
+ const Om=nodoLunare(year);
+ const beta=INCL_LUNARE*Math.sin((lam-Om)*D2R);                // latitudine eclittica
+ const e=obliquita(year)*D2R, l=lam*D2R, b=beta*D2R;
+ const dec=Math.asin(Math.sin(b)*Math.cos(e)+Math.cos(b)*Math.sin(e)*Math.sin(l))*R2D;
+ const ra=((Math.atan2(Math.sin(l)*Math.cos(e)-Math.tan(b)*Math.sin(e),Math.cos(l))*R2D)+360)%360;
+ return [ra,dec];
+}
+// declinazione massima raggiungibile dalla Luna in quell'epoca: e' il ciclo dei lunistizi
+function lunistizio(year){
+ const Om=nodoLunare(year), e=obliquita(year);
+ const dmax=e+INCL_LUNARE*Math.cos(Om*D2R);
+ const stato=Math.cos(Om*D2R)>0.85?'MAGGIORE':(Math.cos(Om*D2R)<-0.85?'minore':'intermedio');
+ return {dmax,stato,nodo:Om,maggiore:e+INCL_LUNARE,minore:e-INCL_LUNARE};
+}
+// ============ ECLISSI ============
+// Un'eclissi e' novilunio (solare) o plenilunio (lunare) che capita vicino a un NODO,
+// dove l'orbita lunare taglia l'eclittica. Il nodo lo abbiamo gia' dai lunistizi.
+// LIMITI ECLITTICI classici, espressi come latitudine eclittica della Luna:
+const LIM_SOLARE=1.58, LIM_LUNARE=1.03;
+// ONESTA': dice SE l'eclissi e' possibile in quella configurazione, non in che giorno
+// accadde ne' da dove fu visibile — per quello servono teoria lunare completa, geometria
+// dell'ombra sulla Terra e il DeltaT della rotazione terrestre (ore, a 3000 anni fa).
+function statoEclissi(lambdaSole,elong,year){
+ if(elong<0)return null;
+ const lam=lambdaSole+elong, Om=nodoLunare(year);
+ const beta=INCL_LUNARE*Math.sin((lam-Om)*D2R);
+ const novilunio=Math.min(elong,360-elong)<14, plenilunio=Math.abs(elong-180)<14;
+ if(novilunio&&Math.abs(beta)<LIM_SOLARE){
+  const g=1-Math.abs(beta)/LIM_SOLARE;
+  return {tipo:'solare',beta,grado:g,
+   nome:g>0.80?'TOTALE o ANULARE possibile':(g>0.45?'parziale profonda':'parziale radente')};}
+ if(plenilunio&&Math.abs(beta)<LIM_LUNARE){
+  const g=1-Math.abs(beta)/LIM_LUNARE;
+  return {tipo:'lunare',beta,grado:g,
+   nome:g>0.72?'TOTALE possibile':(g>0.38?'parziale':'penombrale')};}
+ return null;
+}
+function stagioniEclissi(year){
+ const out=[];
+ for(const [el,tipo] of [[0,'solare'],[180,'lunare']]){
+  let dentro=false,inizio=0;
+  for(let l=0;l<=360;l+=0.1){
+   const ok=!!statoEclissi(l%360,el,year);
+   if(ok&&!dentro){dentro=true;inizio=l;}
+   if(!ok&&dentro){dentro=false;out.push({tipo,da:inizio,a:l});}}
+  if(dentro)out.push({tipo,da:inizio,a:360});}
+ return out;
+}
+// il disco lunare disegnato con la sua fase vera: il terminatore e' un'ellisse
+// La Luna culmina tante ore dopo il Sole quanta e' la sua elongazione (15 gradi = 1 ora):
+// nuova a mezzogiorno, primo quarto al tramonto, piena a mezzanotte, ultimo quarto all'alba.
+function culminaQuando(el){
+ const h=(((12+el/15)%24)+24)%24;
+ if(h<1.5||h>=22.5)return 'culmina a mezzanotte';
+ if(h<4.5) return 'culmina nella notte fonda';
+ if(h<7.5) return 'culmina all\'alba';
+ if(h<10.5)return 'culmina in mattinata';
+ if(h<13.5)return 'culmina a mezzogiorno';
+ if(h<16.5)return 'culmina nel pomeriggio';
+ if(h<19.5)return 'culmina al tramonto';
+ return 'culmina nella prima notte';
+}
+function texturaLuna(elong){
+ const S=96,R=42,cx=S/2,cy=S/2;
+ const c=document.createElement('canvas');c.width=c.height=S;
+ const g=c.getContext('2d'), img=g.createImageData(S,S), d=img.data;
+ const co=Math.cos(elong*D2R), crescente=elong<180;
+ for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+  const u=(x-cx)/R, v=(y-cy)/R, r2=u*u+v*v, i=(y*S+x)*4;
+  if(r2>1){d[i+3]=0;continue;}
+  const s=Math.sqrt(Math.max(0,1-v*v));
+  const acceso=crescente?(u>co*s):(u<-co*s);
+  const bordo=Math.max(0,Math.min(1,(1-Math.sqrt(r2))*R/1.6));
+  if(acceso){d[i]=240;d[i+1]=236;d[i+2]=220;d[i+3]=255*bordo;}
+  else      {d[i]=96; d[i+1]=98; d[i+2]=118;d[i+3]=150*bordo;}   // luce cinerea
+ }
+ g.putImageData(img,0,0);
+ return new THREE.CanvasTexture(c);
+}
+// ============ RIFRAZIONE E ORIZZONTE VERO ============
+// L'aria alza gli astri vicino all'orizzonte: a 0 gradi di altezza vera l'oggetto si VEDE
+// 29 primi piu' in alto. Il Sole che vedi sorgere e' geometricamente ancora sotto l'orizzonte.
+// Formula di Saemundsson, condizioni standard (1010 hPa, 10 gradi C).
+function rifrazione(hVera){
+ if(hVera<-2)return 0;
+ return Math.max(0,1.02/Math.tan((hVera+10.3/(hVera+5.11))*D2R)/60);
+}
+function altApparente(h){return h+rifrazione(h);}
+// Profilo dell'orizzonte ricavato dal DEM: un astro non sorge a zero gradi,
+// sorge quando supera l'altura che ha davanti in quella direzione.
+const NAZ=180;
+let profOrizzonte=null, orizzonteCalcolatoIn=null;
+function calcolaOrizzonte(){
+ if(!terrainSampler){profOrizzonte=null;return;}
+ const p=new Float32Array(NAZ), occhio=rig.position.y+1.7;
+ const e0=rig.position.x, n0=-rig.position.z;
+ for(let i=0;i<NAZ;i++){
+  const a=(i*360/NAZ)*D2R;let hmax=-90;
+  for(let d=30;d<=1400;d+=25){
+   const y=terrainSampler(e0+d*Math.sin(a), n0+d*Math.cos(a));
+   if(!isFinite(y))continue;
+   const h=Math.atan2(y-occhio,d)*R2D;
+   if(h>hmax)hmax=h;}
+  p[i]=hmax;}
+ profOrizzonte=p;
+ orizzonteCalcolatoIn=[e0,n0];
+}
+function orizzonteVerso(az){
+ if(!profOrizzonte)return 0;
+ const x=(((az%360)+360)%360)/360*NAZ, i=Math.floor(x)%NAZ, j=(i+1)%NAZ, f=x-Math.floor(x);
+ return profOrizzonte[i]*(1-f)+profOrizzonte[j]*f;
+}
+// angolo orario in cui un astro raggiunge l'altezza h0 (negativo = levata)
+function angoloOrarioLevata(dec,lat,h0){
+ const c=(Math.sin(h0*D2R)-Math.sin(lat*D2R)*Math.sin(dec*D2R))/(Math.cos(lat*D2R)*Math.cos(dec*D2R));
+ if(c<-1||c>1)return null;
+ return -Math.acos(c)*R2D;
+}
+function angoloOrarioAlba(dec,lat){        // compatibilita': levata geometrica a zero gradi
+ return angoloOrarioLevata(dec,lat,0);
+}
+let skyGeo=null;
+function makeSky(){
+ skyGeo=new THREE.SphereGeometry(R+60,48,32);
+ skyGeo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(skyGeo.attributes.position.count*3),3));
+ {const sm=new THREE.Mesh(skyGeo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide,fog:false,toneMapped:false}));
+  sm.name='VOLTA CELESTE';sm.renderOrder=-1000;
+  sm.material.depthWrite=false;sm.material.depthTest=false;
+  cieloGruppo.add(sm);}
+ // foschia atmosferica: e' il segnale che il cervello usa per giudicare la distanza
+ scene.fog=new THREE.FogExp2(0x0b0507,0.00024);
+ aggiornaCielo(-25,90);   // si parte di notte piena
+}
+// il cielo prende colore dalla posizione reale del Sole
+function aggiornaCielo(sunAlt,sunAz){
+ if(!skyGeo)return;
+ const pos=skyGeo.attributes.position,col=skyGeo.attributes.color,Rs=R+60;
+ const giorno=Math.max(0,Math.min(1,(sunAlt+12)/15));       // 0 notte piena, 1 pieno giorno
+ const crepuscolo=Math.max(0,1-Math.abs(sunAlt)/14);        // massimo col Sole sull'orizzonte
+ const sa=sunAz*D2R;
+ for(let i=0;i<pos.count;i++){
+  const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);
+  const t=Math.pow(Math.max(0,Math.min(1,(y/Rs+0.06)/1.06)),0.55);  // 0 orizzonte, 1 zenit
+  let r=(0.115*(1-t)+0.010*t)*(1-giorno)+(0.60*(1-t)+0.13*t)*giorno;
+  let g=(0.070*(1-t)+0.007*t)*(1-giorno)+(0.72*(1-t)+0.30*t)*giorno;
+  let b=(0.135*(1-t)+0.020*t)*(1-giorno)+(0.88*(1-t)+0.62*t)*giorno;
+  if(crepuscolo>0.01){   // il fuoco dell'alba e del tramonto, dalla parte giusta del cielo
+   let d=Math.abs(Math.atan2(x,-z)-sa);if(d>Math.PI)d=2*Math.PI-d;
+   const f=crepuscolo*Math.max(0,1-d/(Math.PI*0.75))*Math.pow(Math.max(0,1-t),2.2);
+   r+=f*0.85;g+=f*0.36;b+=f*0.10;}
+  col.setXYZ(i,Math.min(1,r),Math.min(1,g),Math.min(1,b));}
+ col.needsUpdate=true;
+ // la foschia prende il colore dell'orizzonte: la lontananza sfuma nel cielo, non nel nero
+ if(renderer)renderer.setClearColor(new THREE.Color(
+  0.115*(1-giorno)+0.60*giorno, 0.070*(1-giorno)+0.72*giorno, 0.135*(1-giorno)+0.88*giorno),1);
+ if(scene.fog)scene.fog.density=0.00024/(1+quotaAGL/260);
+ if(scene.fog)scene.fog.color.setRGB(
+  (0.115*(1-giorno)+0.60*giorno)*0.80,
+  (0.070*(1-giorno)+0.72*giorno)*0.82,
+  (0.135*(1-giorno)+0.88*giorno)*0.86);
+}
+function makeGlowTex(){
+ const c=document.createElement('canvas');c.width=c.height=128;
+ const g=c.getContext('2d');
+ const grad=g.createRadialGradient(64,64,2,64,64,64);
+ grad.addColorStop(0,'rgba(255,248,225,1)');
+ grad.addColorStop(0.25,'rgba(234,217,168,0.45)');
+ grad.addColorStop(1,'rgba(234,217,168,0)');
+ g.fillStyle=grad;g.fillRect(0,0,128,128);
+ return new THREE.CanvasTexture(c);
+}
+function makeGroundTex(){
+ const c=document.createElement('canvas');c.width=c.height=512;
+ const g=c.getContext('2d');
+ g.fillStyle='#c1a679';g.fillRect(0,0,512,512);   // sabbia in piena luce: il buio lo fa la notte
+ for(let i=0;i<9000;i++){
+  g.fillStyle='rgba('+(200+Math.random()*45|0)+','+(180+Math.random()*40|0)+','+(140+Math.random()*40|0)+','+(Math.random()*0.16).toFixed(3)+')';
+  const s=Math.random()*1.8+0.4;
+  g.fillRect(Math.random()*512,Math.random()*512,s,s);}
+ for(let i=0;i<60;i++){ // ondulazioni, dune lontane
+  g.fillStyle='rgba(120,96,64,'+(Math.random()*0.10).toFixed(3)+')';
+  g.beginPath();g.ellipse(Math.random()*512,Math.random()*512,20+Math.random()*60,8+Math.random()*20,Math.random()*Math.PI,0,2*Math.PI);g.fill();}
+ const t=new THREE.CanvasTexture(c);
+ t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,6);
+ return t;
+}
+const LINEDEF=[['Betelgeuse','Bellatrix'],['Bellatrix','Mintaka'],['Mintaka','Alnilam'],
+ ['Alnilam','Alnitak'],['Alnitak','Saiph'],['Saiph','Rigel'],['Rigel','Mintaka'],['Betelgeuse','Alnitak']];
+// dati dei monumenti: ora in catalogo.js
+function azalt2xyz(az,alt,r){const a=az*D2R,h=alt*D2R;
+ return [r*Math.cos(h)*Math.sin(a),r*Math.sin(h),-r*Math.cos(h)*Math.cos(a)];}
+function makeLabel(text,scale){
+ const c=document.createElement('canvas');c.width=256;c.height=64;
+ const g=c.getContext('2d');g.font='28px Georgia';g.fillStyle='#EAD9A8';
+ g.textAlign='center';g.fillText(text,128,40);
+ const m=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),
+  transparent:true,fog:false,toneMapped:false,depthWrite:false}));
+ m.scale.set(scale,scale/4,1);return m;}
+function bc(y){return y<=0 ? (1-y).toLocaleString('it')+" a.C." : Math.round(y)+" d.C.";}
+// Le scritte centrali (epoca, stella al polo, prezzo) si posizionano sotto la barra dei
+// comandi misurandone l'altezza reale: cosi' aggiungere controlli non le copre mai piu'.
+// La bussola: la rosa dei venti RUOTA, il triangolino in cima resta fermo.
+// Quindi il punto cardinale che sta in alto e' quello verso cui stai guardando.
+let rosaPronta=false;
+function disegnaRosa(){
+ const svg=document.getElementById('rosa'); if(!svg)return;
+ let s='<circle cx="0" cy="0" r="42" fill="rgba(11,5,7,0.72)" stroke="#6B1F2A" stroke-width="1.5"/>';
+ s+='<g id="rosaGira">';
+ const punti=[[0,'N','#D4A94A',7],[45,'',''],[90,'E','#EAD9A8',6],[135,'',''],
+              [180,'S','#EAD9A8',6],[225,'',''],[270,'O','#EAD9A8',6],[315,'','']];
+ for(const [a,t,c,fs] of punti){
+  const r=a*Math.PI/180, x=Math.sin(r)*33, y=-Math.cos(r)*33;
+  const x1=Math.sin(r)*40, y1=-Math.cos(r)*40, x2=Math.sin(r)*(t?34:37), y2=-Math.cos(r)*(t?34:37);
+  s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
+     '" stroke="#8a6f3a" stroke-width="1"/>';
+  if(t)s+='<text x="'+x.toFixed(1)+'" y="'+(y+fs*0.36).toFixed(1)+'" fill="'+c+'" font-size="'+fs+
+     '" font-family="Georgia" text-anchor="middle">'+t+'</text>';
+ }
+ s+='</g>';
+ // indicatore fisso: la direzione dello sguardo
+ s+='<polygon points="0,-46 -5,-37 5,-37" fill="#D4A94A"/>';
+ s+='<circle cx="0" cy="0" r="2" fill="#D4A94A"/>';
+ svg.innerHTML=s; rosaPronta=true;
+}
+function aggiornaBussola(){
+ if(!rosaPronta)disegnaRosa();
+ const g=document.getElementById('rosaGira'); if(!g)return;
+ const az=((yaw%360)+360)%360;
+ g.setAttribute('transform','rotate('+(-az).toFixed(1)+')');
+ const nomi=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSO','SO','OSO','O','ONO','NO','NNO'];
+ const el=document.getElementById('azlab');
+ if(el)el.textContent=nomi[Math.round(az/22.5)%16]+'  '+az.toFixed(0)+'\u00b0';
+}
+function disponiScritte(){
+ const b=document.getElementById('bar');
+ if(!b)return;
+ const y=b.getBoundingClientRect().bottom+10;
+ const e=document.getElementById('epoch'), p=document.getElementById('pole'), z=document.getElementById('prezzo');
+ if(e)e.style.top=y+'px';
+ if(p)p.style.top=(y+38)+'px';
+ if(z)z.style.top=(y+76)+'px';
+}
+addEventListener('resize',disponiScritte);
+function init(){
+ scene=new THREE.Scene();
+ camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,6000);
+ camera.position.set(0,1.7,0);
+ renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+ renderer.shadowMap.enabled=true;
+ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+ renderer.toneMapping=THREE.ACESFilmicToneMapping;   // niente bianchi bruciati a mezzogiorno
+ renderer.toneMappingExposure=0.80;
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.xr.enabled=true;
+ document.body.appendChild(renderer.domElement);
+ rig=new THREE.Group();rig.add(camera);scene.add(rig);
+ setupVRControls();
+ const moveKeys={KeyW:0,KeyS:0,KeyA:0,KeyD:0,ArrowUp:0,ArrowDown:0,ArrowLeft:0,ArrowRight:0,
+                 KeyQ:0,KeyE:0,KeyZ:0,KeyX:0};
+ addEventListener('keydown',e=>{
+  if(e.code in moveKeys){moveKeys[e.code]=1;if(e.code.startsWith('Arrow'))e.preventDefault();return;}
+  if(e.code==='Digit1')setMarcia(0);
+  else if(e.code==='Digit2')setMarcia(1);
+  else if(e.code==='Digit3')setMarcia(2);
+  else if(e.code==='KeyN')guardaNadir();
+  else if(e.code==='KeyH')guardaOrizzonte();
+  else if(e.code==='KeyP')scattaRilievo();
+  else if(e.code==='KeyM')toggleRicostruzioni();
+  else if(e.code==='KeyB')toggleBinocolo();
+  else if(e.code==='KeyT')toggleTappeto();
+  else if(e.code==='KeyO')toggleBuio();
+  else if(e.code==='KeyG')cicloGiornoAvanti();
+  else if(e.code==='Space'){e.preventDefault();pausaGiorno();}
+  else if(e.code==='KeyJ'){mostraPianeti=!mostraPianeti;
+   const el=document.getElementById('pia');if(el)el.textContent=mostraPianeti?'accesi':'spenti';update();}
+  else if(e.code==='KeyV'){mostraViaLattea=!mostraViaLattea;
+   const el=document.getElementById('vl');if(el)el.textContent=mostraViaLattea?'accesa':'spenta';}});
+ addEventListener('keyup',e=>{if(e.code in moveKeys)moveKeys[e.code]=0;});
+ window.__moveKeys=moveKeys;
+ renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();
+  setFov(fovCorrente*(e.deltaY>0?1.12:1/1.12));},{passive:false});
+ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+  if(binocoloAcceso)disegnaReticolo();});
+ let drag=false,px=0,py=0;
+ renderer.domElement.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});
+ addEventListener('pointerup',()=>drag=false);
+ addEventListener('pointermove',e=>{if(!drag)return;
+  pitchBersaglio=null;
+  const sens=0.18*Math.max(0.06,fovCorrente/FOV_BASE);   // piu' si ingrandisce, piu' fine e' la mira
+  yaw-=(e.clientX-px)*sens;pitch+=(e.clientY-py)*sens;
+  pitch=Math.max(-90,Math.min(90,pitch));px=e.clientX;py=e.clientY;});
+ cieloGruppo=new THREE.Group();scene.add(cieloGruppo);
+ makeSky();
+ viaLattea=new THREE.Mesh(costruisciViaLattea(),new THREE.MeshBasicMaterial({
+  vertexColors:true,transparent:true,opacity:0,depthWrite:false,depthTest:true,
+  blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false,toneMapped:false}));
+ viaLattea.matrixAutoUpdate=false;
+ cieloGruppo.add(viaLattea);
+ // il Sole come sorgente vera: e' lui a proiettare le ombre sulla piana
+ luceSole=new THREE.DirectionalLight(0xffffff,0);
+ luceSole.castShadow=true;
+ luceSole.shadow.mapSize.set(2048,2048);
+ const sc=luceSole.shadow.camera;
+ sc.left=-950;sc.right=950;sc.top=950;sc.bottom=-950;sc.near=200;sc.far=6000;
+ sc.updateProjectionMatrix();
+ luceSole.shadow.bias=-0.0004;
+ scene.add(luceSole);scene.add(luceSole.target);
+ // luce diffusa: il cielo sopra, il riflesso della sabbia sotto
+ luceCielo=new THREE.HemisphereLight(0x9ec4e8,0xb08d5c,0.35);
+ scene.add(luceCielo);
+ luceDiffusa=new THREE.AmbientLight(0xbfc8d6,0.10);
+ scene.add(luceDiffusa);
+ glowTex=makeGlowTex();
+ const gia=new Set();
+ for(const s of CAT){
+  if(gia.has(s[0]))continue;    // doppione nel catalogo: creerebbe una stella orfana all'origine
+  gia.add(s[0]);
+  const size=Math.max(3,14*Math.pow(10,-0.15*s[5]));
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(size,10,8),
+   new THREE.MeshBasicMaterial({color:0xEAD9A8,transparent:true,opacity:1,fog:false,toneMapped:false,depthWrite:false}));
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,fog:false,
+   transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+  glow.scale.set(size*7,size*7,1);
+  const label=makeLabel(s[0],200);
+  cieloGruppo.add(mesh);cieloGruppo.add(glow);cieloGruppo.add(label);
+  stars[s[0]]={mesh,label,glow};}
+ for(const _ of LINEDEF){
+  const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
+  const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xD4A94A,transparent:true,opacity:0.5,fog:false}));
+  cieloGruppo.add(l);lines.push(l);}
+ sun=new THREE.Mesh(new THREE.SphereGeometry(34,20,16),
+  new THREE.MeshBasicMaterial({color:0xFFF3D0,fog:false,toneMapped:false,depthWrite:false}));
+ sunGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0xF2C14E,fog:false,
+  transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+ sunGlow.scale.set(340,340,1);
+ cieloGruppo.add(sun);cieloGruppo.add(sunGlow);
+ // la Luna: sprite col disco disegnato nella fase corrente
+ for(const nome in PIANETI){
+  const P=PIANETI[nome];
+  const m=new THREE.Mesh(new THREE.SphereGeometry(P.r,12,10),
+   new THREE.MeshBasicMaterial({color:P.col,transparent:true,opacity:1,fog:false,toneMapped:false}));
+  const gl=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:P.col,fog:false,
+   transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));
+  gl.scale.set(P.r*8,P.r*8,1);
+  const lb=makeLabel(nome,150);
+  m.visible=gl.visible=lb.visible=false;
+  cieloGruppo.add(m);cieloGruppo.add(gl);cieloGruppo.add(lb);
+  pianeti[nome]={mesh:m,glow:gl,label:lb};}
+ luna=new THREE.Sprite(new THREE.SpriteMaterial({map:texturaLuna(180),
+  transparent:true,depthWrite:false,fog:false,toneMapped:false}));
+ luna.scale.set(76,76,1);luna.visible=false;cieloGruppo.add(luna);
+ // il chiaro di luna: debole, ma disegna le ombre lunghe della notte
+ luceLuna=new THREE.DirectionalLight(0xc9d4e8,0);
+ scene.add(luceLuna);scene.add(luceLuna.target);
+ const Y=document.getElementById('year'), T=document.getElementById('tline');
+ Y.addEventListener('input',()=>{T.value=Y.value;update();});
+ T.addEventListener('input',()=>{Y.value=T.value;update();});
+ document.getElementById('scene').addEventListener('change',()=>{
+  document.getElementById('lstbox').style.display=
+   document.getElementById('scene').value==='free'?'block':'none';update();});
+ document.getElementById('lst').addEventListener('input',update);
+ document.getElementById('stagione').addEventListener('change',update);
+ document.getElementById('fase').addEventListener('change',update);
+ document.getElementById('site').addEventListener('change',()=>{buildGround();recenterRig();update();});
+ if(navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(ok=>{
+   if(ok) document.getElementById('vrbtn').style.display='block';});
+ menuDalCatalogo();
+ disponiScritte();setTimeout(disponiScritte,300);
+ buildGround();recenterRig();update();
+ let lastT=0;
+ renderer.setAnimationLoop((time)=>{
+  const dt=lastT?Math.min((time-lastT)/1000,0.1):0;lastT=time;
+  playCur+=(playDir-playCur)*0.07;                 // rampa dolce in partenza e in frenata
+  if(Math.abs(playCur)<0.004){playCur=0;}
+  if(playCur!==0){
+   let y=parseFloat(Y.value)+playCur*30;
+   y=Math.max(-200000,Math.min(100000,y));
+   Y.value=Math.round(y);T.value=Y.value;update();
+   if(y<=-200000||y>=100000){playDir=0;playCur=0;}}
+  if(renderer.xr.isPresenting){pollVR(dt);}
+  else{
+   if(vrHud)vrHud.sp.visible=false;
+   for(const c of controllers)c.visible=false;
+   if(pitchBersaglio!==null&&dt){
+    pitch+=(pitchBersaglio-pitch)*Math.min(1,dt*3.2);
+    if(Math.abs(pitchBersaglio-pitch)<0.08){pitch=pitchBersaglio;pitchBersaglio=null;}}
+   // orientamento imposto: rotazione attorno alla verticale (azimut) poi inclinazione (altezza).
+   // Verificato: la direzione risultante coincide con azalt2xyz(yaw,pitch).
+   camera.rotation.set(pitch*D2R,-yaw*D2R,0,'YXZ');
+   const mk=window.__moveKeys;
+   if(dt){
+    const inY=(mk.KeyW||mk.ArrowUp?1:0)-(mk.KeyS||mk.ArrowDown?1:0);
+    const inX=(mk.KeyD||mk.ArrowRight?1:0)-(mk.KeyA||mk.ArrowLeft?1:0);
+    const inZ=(mk.KeyE?1:0)-(mk.KeyQ?1:0);
+    if(mk.KeyZ)setFov(fovCorrente/(1+1.2*dt));
+    if(mk.KeyX)setFov(fovCorrente*(1+1.2*dt));
+    if(inZ)changeAltitude(dt,inZ);
+    if(inX||inY)moveRig(dt,inX,inY);
+    if(inX||inY||inZ){aggiornaQuota();correggiSottoSuolo();aggiornaLuci();
+     if(profOrizzonte&&orizzonteCalcolatoIn){      // spostandosi molto, il profilo cambia
+      const dd=Math.hypot(rig.position.x-orizzonteCalcolatoIn[0],-rig.position.z-orizzonteCalcolatoIn[1]);
+      if(dd>120)calcolaOrizzonte();}}}}
+  correggiSottoSuolo();   // anche in VR: nel visore la testa si abbassa di continuo
+  avanzaGiorno(dt);
+  if(cieloGruppo)cieloGruppo.position.copy(rig.position);
+  aggiornaBussola();
+  aggiornaBinocolo();
+  renderer.render(scene,camera);
+  if(scattoAtteso)eseguiScatto();});
+}
+function play(d){playDir=d;ultimaMarciaTempo=d||ultimaMarciaTempo;aggiornaTastoPausa();}
+// Lo stesso tasto ferma e riparte: fermando si ricorda la direzione, cosi' non si perde l'istante
+let ultimaMarciaTempo=0.12;
+function pausaRiprendi(){
+ if(playDir!==0){ultimaMarciaTempo=playDir;playDir=0;}
+ else playDir=ultimaMarciaTempo;
+ aggiornaTastoPausa();
+}
+function aggiornaTastoPausa(){
+ const b=document.getElementById('btnPausa');
+ if(b)b.value=(playDir!==0)?'\u23F8':'\u25B6';
+}
+function enterVR(){navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor']})
+ .then(s=>{s.addEventListener('end',()=>{rig.rotation.y=0;recenterRig();});renderer.xr.setSession(s);});}
+// ============ MOVIMENTO — a piedi sulla piana, in volo come un drone ============
+// marce: micro-spostamenti, crociera, volo su scala chilometrica
+const MARCE=[{f:0.25,nome:'lenta'},{f:1,nome:'crociera'},{f:4,nome:'alta'}];
+let marcia=1;
+function setMarcia(i){marcia=i;
+ const el=document.getElementById('marcia');if(el)el.textContent=MARCE[i].nome;}
+// teodolite: stringere il campo visivo per verificare gli allineamenti (solo da schermo, in VR lo decide il visore)
+const FOV_BASE=70;let fovCorrente=70;
+function setFov(f){fovCorrente=Math.max(2.5,Math.min(90,f));
+ if(!renderer.xr.isPresenting){camera.fov=fovCorrente;camera.updateProjectionMatrix();}
+ const el=document.getElementById('zoom');if(el)el.textContent=(FOV_BASE/fovCorrente).toFixed(1)+'\u00d7';}
+let pitchBersaglio=null;              // se impostato, lo sguardo ci scivola dentro
+function guardaNadir(){pitchBersaglio=-90;}
+// ============ BINOCOLO — campo stretto, reticolo graduato, identificazione del bersaglio ============
+let binocoloAcceso=false, fovPrimaDelBinocolo=70;
+const FOV_BINOCOLO=7.5;          // circa 9 ingrandimenti, come un binocolo da campagna
+function toggleBinocolo(){
+ const box=document.getElementById('binocolo');
+ if(!box){console.warn('[binocolo] overlay assente nel documento');return;}
+ binocoloAcceso=!binocoloAcceso;
+ if(binocoloAcceso){fovPrimaDelBinocolo=fovCorrente;setFov(FOV_BINOCOLO);disegnaReticolo();}
+ else setFov(fovPrimaDelBinocolo);
+ box.style.display=binocoloAcceso?'block':'none';
+ const el=document.getElementById('bin');if(el)el.textContent=binocoloAcceso?'ACCESO':'spento';
+}
+function disegnaReticolo(){
+ const svg=document.getElementById('binRet');
+ if(!svg)return;
+ const W=innerWidth,H=innerHeight;
+ const pxPerGrado=H/fovCorrente;          // il campo verticale copre esattamente fovCorrente gradi
+ let s='<line x1="'+(W/2-90)+'" y1="'+(H/2)+'" x2="'+(W/2+90)+'" y2="'+(H/2)+
+       '" stroke="#D4A94A" stroke-width="1" opacity="0.75"/>'+
+       '<line x1="'+(W/2)+'" y1="'+(H/2-90)+'" x2="'+(W/2)+'" y2="'+(H/2+90)+
+       '" stroke="#D4A94A" stroke-width="1" opacity="0.75"/>'+
+       '<circle cx="'+(W/2)+'" cy="'+(H/2)+'" r="3" fill="none" stroke="#D4A94A" opacity="0.9"/>';
+ for(let g=1;g<=3;g++){                    // tacche a 1, 2, 3 gradi sui quattro bracci
+  const d=g*pxPerGrado, l=(g===3?11:7);
+  s+='<line x1="'+(W/2+d)+'" y1="'+(H/2-l)+'" x2="'+(W/2+d)+'" y2="'+(H/2+l)+'" stroke="#D4A94A" opacity="0.7"/>';
+  s+='<line x1="'+(W/2-d)+'" y1="'+(H/2-l)+'" x2="'+(W/2-d)+'" y2="'+(H/2+l)+'" stroke="#D4A94A" opacity="0.7"/>';
+  s+='<line x1="'+(W/2-l)+'" y1="'+(H/2+d)+'" x2="'+(W/2+l)+'" y2="'+(H/2+d)+'" stroke="#D4A94A" opacity="0.7"/>';
+  s+='<line x1="'+(W/2-l)+'" y1="'+(H/2-d)+'" x2="'+(W/2+l)+'" y2="'+(H/2-d)+'" stroke="#D4A94A" opacity="0.7"/>';
+  s+='<text x="'+(W/2+d+4)+'" y="'+(H/2-13)+'" fill="#8a6f3a" font-size="10" font-family="Georgia">'+g+'\u00b0</text>';
+ }
+ svg.innerHTML=s;
+}
+// che cosa sta nel mirino: si confronta la direzione di mira con monumenti e stelle
+let stelleInCielo=[];
+function scartoAngolare(az1,alt1,az2,alt2){
+ let dAz=Math.abs(az1-az2);if(dAz>180)dAz=360-dAz;
+ return Math.hypot(dAz*Math.cos((alt1+alt2)/2*D2R),alt1-alt2);
+}
+function aggiornaBinocolo(){
+ if(!binocoloAcceso)return;
+ const d=document.getElementById('binDati');
+ if(!d){binocoloAcceso=false;return;}
+ try{
+ const azMira=((yaw%360)+360)%360, altMira=pitch;
+ let migliore=null,scartoMigliore=3.0;
+ for(const m of monuments){       // monumenti: si traguarda l'apice
+  if(!m.nomeVisibile||!m.obj||!m.obj.visible)continue;
+  const dx=m.e-rig.position.x, dz=(-m.n)-rig.position.z;
+  const dist=Math.hypot(dx,dz); if(dist<1)continue;
+  const apice=m.obj.position.y+(m.spigoliLift!==undefined?m.spigoliLift*2:m.lift);
+  const az=((Math.atan2(dx,-dz)*R2D)+360)%360;
+  const alt=Math.atan2(apice-(rig.position.y+1.7),dist)*R2D;
+  const s=scartoAngolare(azMira,altMira,az,alt);
+  if(s<scartoMigliore){scartoMigliore=s;
+   migliore={nome:m.nomeVisibile,tipo:'a '+Math.round(dist)+' m',az,alt};}}
+ for(const st of stelleInCielo){
+  const s=scartoAngolare(azMira,altMira,st.az,st.alt);
+  if(s<scartoMigliore){scartoMigliore=s;migliore={nome:st.nome,tipo:'stella',az:st.az,alt:st.alt};}}
+ const hOr=orizzonteVerso(azMira);
+ d.innerHTML='mira <b>az '+azMira.toFixed(2)+'\u00b0</b>  alt <b>'+altMira.toFixed(2)+'\u00b0</b>'+
+  (profOrizzonte?'  \u00b7  orizzonte qui: <b>'+(hOr>=0?'+':'')+hOr.toFixed(2)+'\u00b0</b>':'')+
+  (migliore?'  \u00b7  nel mirino: <b>'+migliore.nome+'</b> ('+migliore.tipo+
+   ', az '+migliore.az.toFixed(2)+'\u00b0 alt '+migliore.alt.toFixed(2)+'\u00b0)':'');
+ }catch(err){console.warn('[binocolo]',err);binocoloAcceso=false;}
+}
+// ---- scatto di rilievo: l'immagine porta con se' i dati del momento ----
+let scattoAtteso=false;
+function scattaRilievo(){scattoAtteso=true;}
+function eseguiScatto(){
+ scattoAtteso=false;
+ const sorg=renderer.domElement;
+ const c=document.createElement('canvas');c.width=sorg.width;c.height=sorg.height;
+ const g=c.getContext('2d');
+ g.drawImage(sorg,0,0);
+ const sel=document.getElementById('site');
+ const [sLat,sLon]=sel.value.split(',').map(parseFloat);
+ const nomeSito=sel.options[sel.selectedIndex].textContent;
+ const mlat=110861,mlon=111320*Math.cos(sLat*D2R);
+ const lat=sLat+(-rig.position.z)/mlat, lon=sLon+rig.position.x/mlon;
+ const az=((yaw%360)+360)%360;
+ const anno=parseFloat(document.getElementById('year').value);
+ const righe=[
+  'PRECESSIO \u00b7 rilievo',
+  nomeSito,
+  'epoca: '+bc(anno),
+  'lat '+lat.toFixed(6)+'\u00b0   lon '+lon.toFixed(6)+'\u00b0',
+  'quota dal suolo: '+quotaAGL.toFixed(1)+' m'+
+   (sopraSuolo!==null?'   (occhio sopra la superficie disegnata: '+sopraSuolo.toFixed(2)+' m)':''),
+  'mira: azimut '+az.toFixed(2)+'\u00b0   altezza '+pitch.toFixed(2)+'\u00b0',
+  'campo visivo: '+fovCorrente.toFixed(1)+'\u00b0  ('+(FOV_BASE/fovCorrente).toFixed(1)+'\u00d7)',
+  'al centro dello sguardo: '+cosaMiro(),
+  document.getElementById('pole').textContent
+ ];
+ const s=Math.max(1,c.width/1400);
+ const fh=Math.round(19*s), pad=Math.round(14*s);
+ const bh=fh*righe.length+pad*2;
+ g.fillStyle='rgba(11,5,7,0.72)';
+ g.fillRect(0,c.height-bh,c.width,bh);
+ g.fillStyle='#D4A94A';g.fillRect(0,c.height-bh,c.width,Math.max(1,2*s));
+ g.textAlign='left';g.textBaseline='top';
+ righe.forEach((t,i)=>{
+  g.font=(i===0?'bold ':'')+Math.round(15*s)+'px Georgia';
+  g.fillStyle=i===0?'#D4A94A':'#EAD9A8';
+  g.fillText(t,pad,c.height-bh+pad+i*fh);});
+ const stampa=(new Date()).toISOString().slice(0,19).replace(/[:T]/g,'-');
+ const a=document.createElement('a');
+ a.download='precessio_rilievo_'+stampa+'.png';
+ a.href=c.toDataURL('image/png');
+ a.click();
+}
+function guardaOrizzonte(){pitchBersaglio=0;}
+let quotaAGL=0;                 // metri sopra il terreno: 0 = a piedi, >0 = in volo
+const QUOTA_MAX=9000;          // la volta celeste segue l'osservatore: si puo' salire
+const PASSO=2.2;                // m/s a terra, passo umano
+function terrenoQui(){return terrainSampler?terrainSampler(rig.position.x,-rig.position.z):0;}
+function recenterRig(){
+ quotaAGL=0;rig.position.set(0,terrainSampler?terrainSampler(0,0):0,0);aggiornaQuota();
+}
+// Quanto sta l'occhio sopra la superficie realmente disegnata. Si tira un raggio verso il
+// basso contro le mesh del terreno; se non incontra nulla si prova verso l'alto: in quel caso
+// l'occhio e' SOTTO il suolo e il valore torna negativo.
+const rayMira=new THREE.Raycaster();
+const _cx={x:0,y:0};
+function cosaMiro(){
+ try{
+  rayMira.setFromCamera(_cx,camera);rayMira.far=90000;
+  const h=rayMira.intersectObjects(scene.children,true);
+  const nomi=[];
+  for(const it of h){
+   if(!it.object.visible)continue;
+   if(it.object.isSprite||it.object.isLine||it.object.isLineSegments)continue;
+   nomi.push((it.object.name||it.object.type)+' '+(it.distance<10?it.distance.toFixed(2):Math.round(it.distance))+'m');
+   if(nomi.length>=3)break;}
+  return nomi.length?nomi.join('  |  '):'NULLA';
+ }catch(e){return 'errore';}
+}
+const rayGiu=new THREE.Raycaster();
+const _occhio=new THREE.Vector3();
+let sopraSuolo=null, ultimaMisura=0;
+// Dove sta davvero l'occhio: a schermo lo calcoliamo noi, nel visore lo dice il Quest
+// (la testa e' tracciata, quindi chinandosi o sedendosi l'occhio scende sul serio).
+function posizioneOcchio(){
+ if(renderer.xr.isPresenting){
+  renderer.xr.getCamera(camera).getWorldPosition(_occhio);
+ }else{
+  _occhio.set(rig.position.x,rig.position.y+1.7,rig.position.z);
+ }
+ return _occhio;
+}
+function altezzaSulSuolo(){
+ if(!terreni.length)return null;
+ const p=posizioneOcchio();
+ rayGiu.far=800;
+ rayGiu.set(p,new THREE.Vector3(0,-1,0));
+ let h=rayGiu.intersectObjects(terreni,false);
+ if(h.length)return p.y-h[0].point.y;
+ rayGiu.set(p,new THREE.Vector3(0,1,0));
+ h=rayGiu.intersectObjects(terreni,false);
+ if(h.length)return -(h[0].point.y-p.y);      // negativo: siamo sotto la superficie
+ return null;
+}
+// se l'occhio e' sotto la superficie disegnata, lo si rimette sopra: qualunque sia la causa
+function correggiSottoSuolo(){
+ const t=performance.now();
+ if(t-ultimaMisura<250)return;                // la misura costa: non piu' di 4 volte al secondo
+ ultimaMisura=t;
+ sopraSuolo=altezzaSulSuolo();
+ const em=document.getElementById('mirato');if(em)em.textContent=cosaMiro();
+ const el=document.getElementById('suolo');
+ if(el)el.textContent=(terreni.length===0?'nessun terreno in scena':
+   (sopraSuolo===null?'RAGGIO A VUOTO ('+terreni.length+' superfici)':
+    sopraSuolo.toFixed(2)+' m'+(sopraSuolo<0?'  <-- SOTTO IL SUOLO':'')));
+ const margine=renderer.xr.isPresenting?0.5:1.2;   // in VR l'occhio puo' scendere: basta non entrare nel suolo
+ if(sopraSuolo!==null&&sopraSuolo<margine&&quotaAGL<3){
+  rig.position.y+=(margine-sopraSuolo);
+  sopraSuolo=margine;}
+}
+function quotaMeshQui(){
+ if(!terreni.length)return null;
+ rayGiu.far=3000;
+ rayGiu.set(new THREE.Vector3(rig.position.x,600,rig.position.z),new THREE.Vector3(0,-1,0));
+ const h=rayGiu.intersectObjects(terreni,false);
+ for(const it of h){if(it.object.visible)return it.point.y;}
+ return null;
+}
+// Salendo in quota il visore deve disegnare tutta la piana insieme: si alleggerisce
+// il carico togliendo il dettaglio che da lassu' non si distingue comunque.
+function alleggerisciInQuota(){
+ const alta=quotaAGL>140;
+ if(tappeto)tappeto.visible=mostraTappeto&&!alta;      // il tappeto a 40 cm/pixel da 140 m non si vede
+ if(luceSole)luceSole.castShadow=(ultimoAlt>2.5)&&!alta;   // le ombre costano il doppio del disegno
+ for(const m of monuments)if(m.label)
+  m.label.visible = m.cartello ? true : (mostraRicostruzioni&&!(alta&&quotaAGL>420));
+}
+function aggiornaQuota(){
+ const qm=quotaMeshQui();          // la quota vera della superficie che si vede
+ rig.position.y=(qm!==null?qm:terrenoQui())+quotaAGL;
+ // la mesh del terreno e' interpolata fra vertici distanti ~21 m e puo' stare qualche
+ // decimetro sopra il valore campionato: si tiene un margine perche' l'occhio non ci finisca dentro
+ if(quotaAGL<2)rig.position.y+=0.9;
+ correggiSottoSuolo();
+ alleggerisciInQuota();
+ const el=document.getElementById('quota');
+ if(el)el.textContent=quotaAGL<1?'a terra':('quota '+Math.round(quotaAGL)+' m');
+}
+function changeAltitude(dt,inZ){
+ // salita/discesa progressiva ma controllata, come un drone che prende quota
+ const vSal=Math.min(6+quotaAGL*0.06,90)*MARCE[marcia].f;
+ quotaAGL=Math.max(0,Math.min(QUOTA_MAX,quotaAGL+inZ*vSal*dt));
+}
+function groundForwardRight(){
+ let fx,fz;
+ if(renderer.xr.isPresenting){
+  const cam=renderer.xr.getCamera(camera);
+  const dir=new THREE.Vector3();cam.getWorldDirection(dir);
+  fx=dir.x;fz=dir.z;
+ }else{
+  const yw=yaw*D2R;fx=Math.sin(yw);fz=-Math.cos(yw);
+ }
+ const len=Math.hypot(fx,fz)||1;fx/=len;fz/=len;
+ return {fx,fz,rx:-fz,rz:fx};
+}
+function moveRig(dt,inX,inY){
+ if(Math.hypot(inX,inY)<0.15)return;
+ const {fx,fz,rx,rz}=groundForwardRight();
+ const vel=Math.min(PASSO*(1+quotaAGL/15),320)*MARCE[marcia].f;
+ rig.position.x+=(fx*inY+rx*inX)*vel*dt;
+ rig.position.z+=(fz*inY+rz*inX)*vel*dt;
+ const d=Math.hypot(rig.position.x,rig.position.z),maxR=26000;
+ if(d>maxR){rig.position.x*=maxR/d;rig.position.z*=maxR/d;}
+}
+// ============ COMANDI VR (Meta Quest) ============
+function setupVRControls(){
+ for(let i=0;i<2;i++){
+  const c=renderer.xr.getController(i);
+  c.userData={hand:null,gp:null,prev:{t:false,g:false,a:false,b:false,snap:0}};
+  c.addEventListener('connected',e=>{c.userData.hand=e.data.handedness;c.userData.gp=e.data.gamepad||null;});
+  c.addEventListener('disconnected',()=>{c.userData.gp=null;});
+  const lg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-4)]);
+  const raggio=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xD4A94A,transparent:true,opacity:0.6}));
+  raggio.name='raggio controller';
+  c.add(raggio);c.visible=false;          // si accendono SOLO dentro il visore
+  rig.add(c);controllers.push(c);}
+ const cv=document.createElement('canvas');cv.width=1024;cv.height=192;
+ const tex=new THREE.CanvasTexture(cv);
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+ sp.scale.set(2.6,0.49,1);sp.position.set(0,1.05,-2.8);sp.visible=false;
+ rig.add(sp);vrHud={cv,tex,sp};
+}
+function updateHud(){
+ if(!vrHud)return;const g=vrHud.cv.getContext('2d');
+ g.clearRect(0,0,1024,192);
+ g.textAlign='center';g.fillStyle='#EAD9A8';g.font='64px Georgia';
+ g.fillText(bc(parseFloat(document.getElementById('year').value)),512,70);
+ g.fillStyle='#D4A94A';g.font='30px Georgia';
+ g.fillText(poleTxt+(quotaAGL>=1?'   \u2708 '+Math.round(quotaAGL)+' m':''),512,116);
+ g.font='24px Georgia';g.fillStyle='#8a6f3a';
+ g.fillText('stick sx: muoviti (premilo: marcia '+MARCE[marcia].nome+') \u00b7 stick dx: ruota / quota \u00b7 grilletto: tempo'+
+  (sopraSuolo!==null?'   \u00b7   suolo '+sopraSuolo.toFixed(1)+' m':''),512,164);
+ vrHud.tex.needsUpdate=true;
+}
+function setYear(y){y=Math.max(-200000,Math.min(100000,Math.round(y/10)*10));
+ document.getElementById('year').value=y;document.getElementById('tline').value=y;update();}
+function cycleSelect(id){const s=document.getElementById(id);
+ s.selectedIndex=(s.selectedIndex+1)%s.options.length;
+ s.dispatchEvent(new Event('change'));}
+function pollVR(dt){
+ vrHud.sp.visible=true;
+ for(const c of controllers)c.visible=true;
+ let mosso=false;
+ for(const c of controllers){
+  const gp=c.userData.gp,P=c.userData.prev;if(!gp)continue;
+  const ax=gp.axes;
+  const sx=(ax.length>=4?ax[2]:(ax[0]||0));
+  const sy=(ax.length>=4?ax[3]:(ax[1]||0));
+  if(c.userData.hand==='left'){
+   if(dt&&Math.hypot(sx,sy)>0.15){moveRig(dt,sx,-sy);mosso=true;}   // cammina/vola in orizzontale
+  }else{
+   if(dt&&Math.abs(sy)>0.2){changeAltitude(dt,-sy);mosso=true;}      // sali e scendi
+   if(sx>0.6&&P.snap!==1){rig.rotation.y-=Math.PI/6;P.snap=1;}
+   else if(sx<-0.6&&P.snap!==-1){rig.rotation.y+=Math.PI/6;P.snap=-1;}
+   else if(Math.abs(sx)<0.3)P.snap=0;}
+  const b=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed);
+  // grilletto = marcia lenta, presa laterale = marcia veloce (nel visore serve delicatezza)
+  if(b(0)&&!P.t){playDir=(playDir!==0)?0:(c.userData.hand==='left'?-0.12:0.12);}P.t=b(0);
+  if(b(1)&&!P.g){playDir=(playDir!==0)?0:(c.userData.hand==='left'?-1:1);}P.g=b(1);
+  if(b(3)&&!P.s){                     // pressione dello stick: cambia marcia
+   if(c.userData.hand==='left'){setMarcia((marcia+1)%MARCE.length);
+    if(vrHud)vrHud.sp.visible=true;}}P.s=b(3);
+  if(b(4)&&!P.a){cycleSelect('scene');}P.a=b(4);
+  if(b(5)&&!P.b){cycleSelect('site');}P.b=b(5);
+ }
+ if(mosso)aggiornaQuota();
+}
+function menuDalCatalogo(){
+ if(!window.CATALOGO)return;
+ const sel=document.getElementById('site');
+ const voci=[];
+ for(const k in CATALOGO){const s=CATALOGO[k];
+  for(const o of (s.osservatori||[])){
+   const op=document.createElement('option');
+   op.value=o.lat+','+o.lon;
+   op.textContent=s.nome.replace('Piana di ','')+' \u2014 '+o.nome;
+   voci.push(op);}}
+ for(let i=voci.length-1;i>=0;i--)sel.insertBefore(voci[i],sel.firstChild);
+ sel.selectedIndex=0;
+}
+// Piramide a gradoni: i corsi di muratura, non un cono liscio.
+// Un'unica geometria con N scalini: alzata verticale + pedata orizzontale per corso.
+function piramideGradoni(semiBase,altezza,corsi){
+ const v=[],idx=[],col=[];
+ let tono=1;
+ const quad=(a,b,c,d)=>{const i=v.length/3;v.push(...a,...b,...c,...d);
+  for(let q=0;q<4;q++)col.push(tono,tono*0.995,tono*0.985);
+  idx.push(i,i+1,i+2, i,i+2,i+3);};
+ for(let k=0;k<corsi;k++){
+  // ogni corso ha la sua pietra: rumore leggero piu' un velo di erosione verso la base
+  const rnd=Math.abs(Math.sin(k*127.1+311.7)*43758.5453)%1;
+  tono=(0.86+0.14*rnd)*(0.90+0.10*(k/corsi));
+  const y0=altezza*k/corsi, y1=altezza*(k+1)/corsi;
+  const w0=semiBase*(1-k/corsi), w1=semiBase*(1-(k+1)/corsi);
+  // alzata: le quattro facce verticali del corso
+  quad([-w0,y0,-w0],[ w0,y0,-w0],[ w0,y1,-w0],[-w0,y1,-w0]);
+  quad([ w0,y0, w0],[-w0,y0, w0],[-w0,y1, w0],[ w0,y1, w0]);
+  quad([ w0,y0,-w0],[ w0,y0, w0],[ w0,y1, w0],[ w0,y1,-w0]);
+  quad([-w0,y0, w0],[-w0,y0,-w0],[-w0,y1,-w0],[-w0,y1, w0]);
+  // pedata: il gradino orizzontale che rientra verso il corso successivo
+  quad([-w0,y1,-w0],[ w0,y1,-w0],[ w1,y1,-w1],[-w1,y1,-w1]);
+  quad([ w0,y1, w0],[-w0,y1, w0],[-w1,y1, w1],[ w1,y1, w1]);
+  quad([ w0,y1,-w0],[ w0,y1, w0],[ w1,y1, w1],[ w1,y1,-w1]);
+  quad([-w0,y1, w0],[-w0,y1,-w0],[-w1,y1,-w1],[-w1,y1, w1]);
+ }
+ const g=new THREE.BufferGeometry();
+ g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+ g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+ g.setIndex(idx);g.computeVertexNormals();
+ return g;
+}
+// tinte: i monumenti sono scuri di notte e calcarei in pieno sole
+const TINTE={
+ pietra:  {notte:0x1d0d10, giorno:0xB6A085},   // calcare del nucleo, eroso
+ calcare: {notte:0x6d5b46, giorno:0xDCCEB4},   // Tura, il rivestimento fine
+ granito: {notte:0x3d1a18, giorno:0x8E6A5C},   // Assuan, i corsi bassi di Micerino
+ sfinge:  {notte:0x241014, giorno:0xC0A98B}
+};
+function materialePietra(tipo,dentro){
+ const t=TINTE[tipo]||TINTE.pietra;
+ // colore = albedo reale della pietra; a fare giorno e notte ci pensano le luci
+ return dentro
+  ?new THREE.MeshLambertMaterial({color:t.giorno,transparent:true,opacity:0.12,depthWrite:false})
+  :new THREE.MeshLambertMaterial({color:t.giorno});
+}
+// le luci seguono il Sole: intensita', colore e direzione delle ombre
+function aggiornaLuci(){
+ if(!luceSole)return;
+ for(const t of terreni)t.receiveShadow=true;
+ const alt=ultimoAlt,az=ultimoAz;
+ const giorno=Math.max(0,Math.min(1,(alt+6)/12));
+ const [lx,ly,lz]=azalt2xyz(az,Math.max(alt,0.7),2600);
+ luceSole.position.set(rig.position.x+lx,ly,rig.position.z+lz);
+ luceSole.target.position.set(rig.position.x,0,rig.position.z);
+ luceSole.target.updateMatrixWorld();
+ luceSole.intensity=1.30*giorno;
+ luceSole.castShadow=alt>2.5;   // sotto i 2,5 gradi l'ombra copre tutto: meglio spegnerla
+ const radente=Math.max(0,1-Math.max(alt,0)/14);   // radente = luce calda, ombre lunghissime
+ luceSole.color.setRGB(1,1-0.26*radente,1-0.58*radente);
+ luceCielo.intensity=0.10+0.50*giorno;
+ // al crepuscolo il cielo e' luminosissimo e illumina il suolo da tutte le direzioni:
+ // senza questo contributo il terreno resta cupo sotto una volta chiara
+ const crepusc=Math.max(0,1-Math.abs(alt)/14);
+ if(luceDiffusa)luceDiffusa.intensity=0.10+0.22*giorno+0.20*crepusc;   // il cielo e' una sorgente ampia: all'alba illumina il suolo
+ luceCielo.color.setRGB(0.10+0.52*giorno,0.14+0.63*giorno,0.24+0.67*giorno);
+ luceCielo.groundColor.setRGB(0.09+0.60*giorno,0.07+0.48*giorno,0.06+0.30*giorno);
+}
+function tintaMonumenti(){aggiornaLuci();}
+function costruisciSfinge(lung,larg,alt,mat){
+ const g=new THREE.Group();
+ const B=(sx,sy,sz,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat);
+  m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;g.add(m);return m;};
+ const L=lung, W=larg, H=alt;
+ // corpo leonino, la parte posteriore piu' bassa
+ B(L*0.52, H*0.55, W*0.78, -L*0.13, H*0.275, 0);
+ B(L*0.30, H*0.42, W*0.62, -L*0.36, H*0.21, 0);          // groppa
+ // zampe protese in avanti, separate
+ B(L*0.42, H*0.22, W*0.20, L*0.24, H*0.11,  W*0.26);
+ B(L*0.42, H*0.22, W*0.20, L*0.24, H*0.11, -W*0.26);
+ // torace che si alza verso il collo
+ B(L*0.20, H*0.78, W*0.60, L*0.06, H*0.39, 0);
+ // collo e testa
+ B(L*0.11, H*0.30, W*0.34, L*0.10, H*0.86, 0);
+ B(L*0.13, H*0.26, W*0.38, L*0.115, H*1.10, 0);          // volto
+ // nemes: il copricapo che scende ai lati
+ B(L*0.15, H*0.30, W*0.56, L*0.09, H*1.06, 0);
+ B(L*0.05, H*0.34, W*0.14, L*0.13, H*0.86,  W*0.24);
+ B(L*0.05, H*0.34, W*0.14, L*0.13, H*0.86, -W*0.24);
+ return g;
+}
+function trovaSito(lat,lon){
+ if(!window.CATALOGO)return null;
+ for(const k in CATALOGO){const s=CATALOGO[k];
+  if(Math.abs(lat-s.centro.lat)<(s.raggio||0.05)&&Math.abs(lon-s.centro.lon)<(s.raggio||0.05))return s;}
+ return null;}
+function buildGround(){
+ const my=++groundId;
+ if(groundGroup)scene.remove(groundGroup);
+ groundGroup=new THREE.Group();monuments=[];terreni=[];terrainSampler=null;
+ const parts=document.getElementById('site').value.split(',');
+ const lat=parseFloat(parts[0]),lon=parseFloat(parts[1]);
+ const ground=new THREE.Mesh(new THREE.CircleGeometry(32000,72),
+  new THREE.MeshLambertMaterial({map:makeGroundTex(),side:THREE.DoubleSide}));
+ ground.rotation.x=-Math.PI/2;ground.position.y=-0.6;
+ ground.name='FONDO(disco)';groundGroup.add(ground);terreni.push(ground);discoBase=ground;
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(R-5,2.2,8,128),
+  new THREE.MeshBasicMaterial({color:0xD4A94A}));
+ ring.rotation.x=Math.PI/2;ring.position.y=0.5;groundGroup.add(ring);
+ for(const [az,txt] of [[0,'NORD'],[90,'EST'],[180,'SUD'],[270,'OVEST']]){
+  const l=makeLabel(txt,220);const [x,y,z]=azalt2xyz(az,1.5,R-40);
+  l.position.set(x,y+30,z);groundGroup.add(l);}
+ const mlat=110861,mlon=111320*Math.cos(lat*D2R);
+ const EN=(plat,plon)=>[(plon-lon)*mlon,(plat-lat)*mlat];
+ // cartello con il nome di ogni sito, cosi' si riconosce da lontano
+ if(window.CATALOGO)for(const k in CATALOGO){
+  const S=CATALOGO[k]; if(!S.centro)continue;
+  const [se,sn]=EN(S.centro.lat,S.centro.lon);
+  const d=Math.hypot(se,sn);
+  if(d<400||d>30000)continue;                    // non sul posto, e non oltre la scala utile
+  const alt=Math.max(140,d*0.075);               // il cartello sale con la distanza, per restare leggibile
+  const lb=makeLabel(S.nome.toUpperCase(),Math.max(320,d*0.16));
+  lb.material.depthTest=false;                   // nessun rilievo puo' nasconderlo
+  lb.material.depthWrite=false;
+  lb.renderOrder=900;
+  lb.userData.cartello=true;                     // esente dall'alleggerimento in quota
+  lb.position.set(se,alt,-sn);
+  groundGroup.add(lb);
+  monuments.push({obj:null,label:lb,e:se,n:sn,lift:0,labelLift:alt,nomeVisibile:S.nome,cartello:true});
+ }
+ // ---- costruzione dal CATALOGO (catalogo.js) ----
+ const sito=trovaSito(lat,lon);
+ const etichette=[];   // per districare quelle che si accavallano
+ if(sito){
+  const forza=new URLSearchParams(location.search).get('tutto')==='1';
+  const trovato={};
+  // TUTTI i siti del catalogo, non solo quello sotto i piedi: le coordinate sono assolute,
+  // quindi Saqqara compare al posto giusto a 14 km da Giza e si puo' studiare l'insieme.
+  const elementiTutti=[];
+  for(const k in CATALOGO)for(const e2 of (CATALOGO[k].elementi||[]))elementiTutti.push(e2);
+  for(const el of elementiTutti){
+   if(!el.attivo&&!forza)continue;
+   if(el.tipo==='nastro')continue;              // i nastri si tracciano dopo
+   const [e0,n0]=EN(el.lat,el.lon);
+   const e=e0+(el.offsetEst||0),n=n0+(el.offsetNord||0);
+   trovato[el.id]={e,n};
+   const dist=Math.hypot(e,n);
+   if(dist>30000)continue;   // limite alla scala dell'insieme (prima era 1700 m: tagliava Saqqara)
+   const incerto=(el.fonte==='approssimato');
+   const oro=incerto?0x8a6f3a:0xD4A94A;
+   // ingombro dell'elemento: se l'osservatore ci sta dentro, lo si rende trasparente
+   const raggio=el.tipo==='piramide'?el.base/2
+              :(el.tipo==='marker'?el.raggio
+              :Math.max(el.lunghezza||0,el.larghezza||0)/2);
+   const dentro=dist<raggio*1.15;
+   if(el.tipo==='sfinge'){
+    const gr=costruisciSfinge(el.lunghezza||73,el.larghezza||19,el.altezza||20,
+                              materialePietra('sfinge',dentro));
+    gr.position.set(e,0,-n);
+    // il modello ha la testa verso +X, cioe' EST. Per puntarlo all'azimut A: rotazione = 90 - A.
+    gr.rotation.y=(90-(el.orientamento!==undefined?el.orientamento:90))*D2R;
+    const lb=makeLabel(el.nome,180);lb.position.set(e,(el.altezza||20)+30,-n);
+    groundGroup.add(gr);groundGroup.add(lb);
+    const mo={obj:gr,label:lb,e,n,lift:0,labelLift:(el.altezza||20)+30,nomeVisibile:el.nome};
+    monuments.push(mo);etichette.push({mo,lb,e,n,dist});
+   }
+   else if(el.tipo==='piramide'){
+    // un corso ogni ~2,5 m di altezza: la muratura si legge senza appesantire il visore
+    const corsi=Math.max(8,Math.min(72,Math.round(el.altezza/2.5)));
+    const matPy=materialePietra('pietra',dentro);
+    matPy.vertexColors=true;
+    const py=new THREE.Mesh(piramideGradoni(el.base/2,el.altezza,corsi),matPy);
+    py.position.set(e,0,-n);
+    // gli spigoli dorati restano solo dove il dato e' incerto: sono un'annotazione, non la pietra
+    let ed=null;
+    if(incerto){
+     ed=new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.ConeGeometry(el.base/Math.SQRT2,el.altezza,4)),
+      new THREE.LineBasicMaterial({color:oro,transparent:true,opacity:0.35}));
+     ed.position.set(e,el.altezza/2,-n);ed.rotation.y=Math.PI/4;}
+    const lb=makeLabel(el.nome,180);lb.position.set(e,el.altezza+40,-n);
+    groundGroup.add(py);if(ed)groundGroup.add(ed);groundGroup.add(lb);
+    const mo={obj:py,edges:ed,label:lb,e,n,lift:0,labelLift:el.altezza+40,spigoliLift:el.altezza/2,
+              raggio:el.base/2,nomeVisibile:el.nome};
+    monuments.push(mo);etichette.push({mo,lb,e,n,dist});
+    if(el.rivestimento){ // calotta di calcare di Tura ancora in posto: liscia, non a gradoni
+     const CH=el.rivestimento,rb=(el.base/Math.SQRT2)*(CH/el.altezza);
+     const cap=new THREE.Mesh(new THREE.ConeGeometry(rb,CH,4),materialePietra('calcare'));
+     cap.position.set(e,el.altezza-CH/2,-n);cap.rotation.y=Math.PI/4;
+     groundGroup.add(cap);
+     monuments.push({obj:cap,e,n,lift:el.altezza-CH/2,labelLift:0,raggio:el.base/2});}
+    if(el.zoccolo){ // corsi inferiori in granito di Assuan
+     const GH=el.zoccolo,rb=el.base/Math.SQRT2,rt=rb*(1-GH/el.altezza);
+     const gr=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,GH,4),materialePietra('granito'));
+     gr.position.set(e,GH/2,-n);gr.rotation.y=Math.PI/4;
+     groundGroup.add(gr);
+     monuments.push({obj:gr,e,n,lift:GH/2,labelLift:0,raggio:el.base/2});}
+   }else if(el.tipo==='blocco'||el.tipo==='recinto'){
+    const pieno=(el.tipo==='blocco');
+    const bx=new THREE.Mesh(new THREE.BoxGeometry(el.lunghezza,el.altezza,el.larghezza),
+     (pieno&&!dentro)?materialePietra('sfinge',false)
+     :new THREE.MeshBasicMaterial({color:oro,wireframe:true,transparent:true,opacity:dentro?0.25:0.4}));
+    bx.position.set(e,el.altezza/2,-n);
+    bx.rotation.y=-((el.azimut||90)-90)*D2R;
+    let ed=null;
+    if(pieno){ed=new THREE.LineSegments(new THREE.EdgesGeometry(bx.geometry),
+      new THREE.LineBasicMaterial({color:oro}));
+     ed.position.copy(bx.position);ed.rotation.copy(bx.rotation);groundGroup.add(ed);}
+    const lb=makeLabel(el.nome,pieno?150:170);
+    lb.position.set(e,el.altezza+(dentro?90:35),-n);
+    groundGroup.add(bx);groundGroup.add(lb);
+    const mo={obj:bx,edges:ed,label:lb,e,n,lift:el.altezza/2,labelLift:el.altezza+(dentro?90:35),
+              nomeVisibile:el.nome};
+    monuments.push(mo);etichette.push({mo,lb,e,n,dist});
+   }else if(el.tipo==='marker'){
+    const co=new THREE.Mesh(new THREE.ConeGeometry(el.raggio,el.altezza,24),
+     new THREE.MeshBasicMaterial({color:oro,wireframe:true,transparent:true,opacity:0.45}));
+    co.position.set(e,el.altezza/2,-n);
+    const lb=makeLabel(el.nome,150);lb.position.set(e,el.altezza+32,-n);
+    groundGroup.add(co);groundGroup.add(lb);
+    const mo={obj:co,label:lb,e,n,lift:el.altezza/2,labelLift:el.altezza+32,nomeVisibile:el.nome};
+    monuments.push(mo);etichette.push({mo,lb,e,n,dist});}}
+  // nastri (rampe, allineamenti) fra elementi gia' posizionati
+  for(const el of sito.elementi){
+   if(el.tipo!=='nastro'||(!el.attivo&&!forza))continue;
+   const A=trovato[el.da],B=trovato[el.a];if(!A||!B)continue;
+   const dx=B.e-A.e,dz=(-B.n)-(-A.n),L=Math.hypot(dx,dz);
+   if(L<10)continue;
+   const nastro=new THREE.Mesh(new THREE.BoxGeometry(L*0.85,el.altezza||1,el.larghezza||5),
+    new THREE.MeshBasicMaterial({color:0xD4A94A,transparent:true,opacity:0.35}));
+   nastro.position.set((A.e+B.e)/2,(el.altezza||1)/2,(-A.n+-B.n)/2);
+   nastro.rotation.y=Math.atan2(-dz,dx);
+   groundGroup.add(nastro);
+   monuments.push({obj:nastro,e:(A.e+B.e)/2,n:(A.n+B.n)/2,lift:(el.altezza||1)/2,labelLift:0});}}
+ // districa le etichette vicine in direzione: la piu' lontana sale di un gradino
+ etichette.sort((a,b)=>a.dist-b.dist);
+ const messe=[];
+ for(const t of etichette){
+  const az=(Math.atan2(t.e,t.n)*R2D+360)%360;
+  let salto=0;
+  for(const m of messe){
+   let d=Math.abs(az-m.az);if(d>180)d=360-d;
+   if(d<6)salto=Math.max(salto,m.salto+1);}
+  messe.push({az,salto});
+  if(salto>0){
+   const su=salto*55;
+   t.lb.position.y+=su;
+   t.mo.labelLift+=su;}}
+ for(const m of monuments)if(m.obj&&m.obj.isMesh){m.obj.castShadow=true;m.obj.receiveShadow=true;}
+ applicaRicostruzioni();
+ scene.add(groundGroup);
+ buildTerrain(lat,lon,my,mlat,mlon);
+}
+function update(){
+ const lat=parseFloat(document.getElementById('site').value.split(',')[0]);
+ const year=parseFloat(document.getElementById('year').value);
+ const mode=document.getElementById('scene').value;
+ const lambda=parseFloat(document.getElementById('stagione').value);
+ const pos={};for(const s of CAT)pos[s[0]]=starOfDate(s,year);
+ // il Sole di quella stagione, in quell'epoca (obliquita' dell'epoca, non di oggi)
+ const [raSole,decSole]=soleRaDec(lambda,year);
+ // Il Sole "sorge" quando il lembo superiore appare: centro a -0,833 gradi (34' di
+ // rifrazione + 16' di semidiametro), PIU' l'altezza dell'altura che ha davanti.
+ let h0Sole=-0.833;
+ let H0=angoloOrarioLevata(decSole,lat,h0Sole);
+ if(H0!==null&&profOrizzonte){                    // seconda passata con l'orizzonte vero
+  const lstP=((raSole+H0)%360+360)%360;
+  const azP=altaz(raSole,decSole,lstP,lat)[1];
+  h0Sole=-0.833+orizzonteVerso(azP);
+  const H1=angoloOrarioLevata(decSole,lat,h0Sole);
+  if(H1!==null)H0=H1;
+ }
+ let lst;
+ if(mode==='dawn')      lst=raSole+(H0===null?-90:H0);
+ else if(mode==='noon') lst=raSole;
+ else if(mode==='dusk') lst=raSole-(H0===null?-90:H0);
+ else if(mode==='culm') lst=pos['Alnilam'][0];
+ else                   lst=parseFloat(document.getElementById('lst').value);
+ lst=((lst%360)+360)%360;
+ document.getElementById('lstval').textContent=Math.round(lst)+'\u00b0';
+ const [raSoleA,decSoleA]=conAsse(raSole,decSole);
+ const [altSoleVera,azSole]=altaz(raSoleA,decSoleA,lst,lat);
+ const altSole=altApparente(altSoleVera);        // e' quella che l'occhio vede
+ // col Sole alto le stelle svaniscono, come nella realta'
+ const velo=buioSempre?1:Math.max(0,Math.min(1,(3-altSole)/9));
+ let bestPole=null;
+ stelleInCielo=[];
+ for(const s of CAT){
+  const [ra,dec]=pos[s[0]];
+  const pd=90-Math.abs(dec);
+  if(bestPole===null||pd<bestPole[1])bestPole=[s[0],pd];
+  const [raS2,decS2]=conAsse(ra,dec);
+  const [altVera,az]=altaz(raS2,decS2,lst,lat);
+  const alt=altApparente(altVera);               // rifrazione: le costellazioni si schiacciano all'orizzonte
+  const o=stars[s[0]];
+  // difesa: se il calcolo non da' numeri validi la stella sparisce, invece di
+  // materializzarsi all'origine della scena, cioe' addosso a chi guarda
+  const vis=alt>-1&&velo>0.02&&isFinite(alt)&&isFinite(az);
+  o.mesh.visible=vis;o.label.visible=vis;o.glow.visible=vis;
+  if(vis){const [x,y,z]=azalt2xyz(az,alt,R);
+   if(!isFinite(x)||!isFinite(y)||!isFinite(z)){
+    o.mesh.visible=o.label.visible=o.glow.visible=false;continue;}
+   o.mesh.position.set(x,y,z);o.glow.position.set(x,y,z);o.label.position.set(x,y+45,z);
+   stelleInCielo.push({nome:s[0],az,alt});
+   o.mesh.material.opacity=velo;
+   o.label.material.opacity=velo;
+   o.glow.material.opacity=Math.min(1,0.35+Math.max(0,alt)/18)*velo;}}
+ LINEDEF.forEach(([a,b],i)=>{
+  const A=altaz(...conAsse(...pos[a]),lst,lat),B=altaz(...conAsse(...pos[b]),lst,lat);
+  A[0]=altApparente(A[0]);B[0]=altApparente(B[0]);
+  const ok=A[0]>-1&&B[0]>-1&&velo>0.02;lines[i].visible=ok;
+  lines[i].material.opacity=0.5*velo;
+  if(ok){const pts=lines[i].geometry.attributes.position.array;
+   const p1=azalt2xyz(A[1],A[0],R),p2=azalt2xyz(B[1],B[0],R);
+   pts[0]=p1[0];pts[1]=p1[1];pts[2]=p1[2];pts[3]=p2[0];pts[4]=p2[1];pts[5]=p2[2];
+   lines[i].geometry.attributes.position.needsUpdate=true;}});
+ let giornoOra=buioSempre?0:Math.max(0,Math.min(1,(altSole+12)/15));
+ // eclissi solare in corso: il giorno si spegne in proporzione a quanto il disco e' coperto
+ if(eclissi&&eclissi.tipo==='solare'&&altSole>-2)giornoOra*=(1-0.93*eclissi.grado);
+ aggiornaCielo(buioSempre?-25:altSole,azSole);
+ ultimoGiorno=giornoOra;
+ ultimoAlt=buioSempre?-25:altSole;ultimoAz=azSole;
+ aggiornaLuci();
+ if(altSole>-1)stelleInCielo.push({nome:'Sole',az:azSole,alt:altSole});
+ // ---- i pianeti ----
+ for(const nome in pianeti){
+  const o=pianeti[nome];
+  let ok=false,altP=0,azP=0;
+  if(mostraPianeti){
+   const [raP,decP]=pianetaRaDec(nome,year,lambda);
+   if(isFinite(raP)&&isFinite(decP)){
+    const [raPA,decPA]=conAsse(raP,decP);
+    const r=altaz(raPA,decPA,lst,lat);
+    altP=altApparente(r[0]);azP=r[1];
+    ok=altP>-1&&velo>0.02&&isFinite(altP)&&isFinite(azP);}}
+  o.mesh.visible=o.glow.visible=o.label.visible=ok;
+  if(ok){
+   const [x,y,z]=azalt2xyz(azP,altP,R);
+   if(!isFinite(x)||!isFinite(y)||!isFinite(z)){o.mesh.visible=o.glow.visible=o.label.visible=false;continue;}
+   o.mesh.position.set(x,y,z);o.glow.position.set(x,y,z);o.label.position.set(x,y+40,z);
+   o.mesh.material.opacity=velo;o.label.material.opacity=velo;o.glow.material.opacity=0.5*velo;
+   stelleInCielo.push({nome,az:azP,alt:altP});}}
+ // ---- la Via Lattea ----
+ if(viaLattea){
+  const C=matriceCielo(year,lst,lat);
+  viaLattea.matrix.set(C[0][0],C[0][1],C[0][2],0,
+                       C[1][0],C[1][1],C[1][2],0,
+                       C[2][0],C[2][1],C[2][2],0,
+                       0,0,0,1);
+  viaLattea.visible=mostraViaLattea&&velo>0.03;
+  viaLattea.material.opacity=0.32*velo;
+  viaLattea.matrixWorldNeedsUpdate=true;
+  // il centro galattico come punto traguardabile
+  const [raCG,decCG]=gal2eq(0,0);
+  const vCG=mv(precMatrix((year-2000)/100),vec(raCG,decCG));
+  const [raCGd,decCGd]=radec(vCG);
+  const [altCG,azCG]=altaz(raCGd,decCGd,lst,lat);
+  if(altCG>-1&&velo>0.03)stelleInCielo.push({nome:'Centro galattico',az:azCG,alt:altCG});
+ }
+ // ---- la Luna ----
+ const elong=parseFloat(document.getElementById('fase').value);
+ let testoLuna='';
+ eclissi=statoEclissi(lambda,elong,year);
+ if(elong<0){luna.visible=false;luceLuna.intensity=0;}
+ else{
+  const [raL,decL]=lunaRaDec(lambda,elong,year);
+  const [raLA,decLA]=conAsse(raL,decL);
+  const [altLVera,azL]=altaz(raLA,decLA,lst,lat);
+  const altL=altApparente(altLVera);
+  const suOrizzonte=altL>-0.5;
+  luna.visible=suOrizzonte;
+  if(faseLunaDisegnata!==elong){                       // il disco si ridisegna solo se la fase cambia
+   luna.material.map=texturaLuna(elong);
+   luna.material.needsUpdate=true;faseLunaDisegnata=elong;}
+  const illuminata=(1-Math.cos(elong*D2R))/2;          // frazione di disco illuminata
+  if(suOrizzonte){
+   const [lx,ly,lz]=azalt2xyz(azL,altL,R);
+   luna.position.set(lx,ly,lz);
+   luna.material.opacity=Math.max(0.62,1-giornoOra*0.35);
+   if(eclissi&&eclissi.tipo==='solare'){          // deve coprire il Sole: opaca e davanti
+    luna.material.opacity=1;luna.renderOrder=50;luna.material.color.setRGB(0.06,0.05,0.07);}
+   else if(eclissi&&eclissi.tipo==='lunare'){     // nell'ombra della Terra si fa ramata
+    const q=eclissi.grado;
+    luna.material.color.setRGB(1-0.30*q,1-0.70*q,1-0.84*q);luna.renderOrder=0;}
+   else{luna.material.color.setRGB(1,1,1);luna.renderOrder=0;}
+   const [dx,dy,dz]=azalt2xyz(azL,Math.max(altL,1),2600);
+   luceLuna.position.set(rig.position.x+dx,dy,rig.position.z+dz);
+   luceLuna.target.position.set(rig.position.x,0,rig.position.z);
+   luceLuna.target.updateMatrixWorld();
+   luceLuna.intensity=0.16*illuminata*(1-giornoOra)*Math.min(1,Math.max(0,altL)/12+0.25);
+   stelleInCielo.push({nome:'Luna',az:azL,alt:altL});
+  }else luceLuna.intensity=0;
+  const L=lunistizio(year);
+  testoLuna='   \u00b7   \u263e '+(illuminata*100).toFixed(0)+'% '+
+   (suOrizzonte?('alt '+(altL>=0?'+':'')+altL.toFixed(1)+'\u00b0 az '+Math.round(azL)+'\u00b0')
+               :('sotto l\'orizzonte \u2014 '+culminaQuando(elong)))+
+   '  dec '+(decL>=0?'+':'')+decL.toFixed(1)+'\u00b0  [lunistizio '+L.stato+', max '+L.dmax.toFixed(1)+'\u00b0]';
+ }
+ const soleVisibile=altSole>-2&&!buioSempre;
+ sun.visible=soleVisibile;sunGlow.visible=soleVisibile;
+ if(soleVisibile){
+  const [x,y,z]=azalt2xyz(azSole,altSole,R);
+  sun.position.set(x,y,z);sunGlow.position.set(x,y,z);
+  // radente sull'orizzonte: il disco si arrossa e l'alone si allarga
+  const basso=Math.max(0,1-Math.abs(altSole)/12);
+  sun.material.color.setRGB(1,1-0.32*basso,1-0.72*basso);
+  sunGlow.scale.set(340+basso*430,340+basso*430,1);
+  sunGlow.material.opacity=0.55+0.45*basso;}
+ document.getElementById('epoch').textContent=bc(year);
+ poleTxt='\u2605 al polo: '+bestPole[0]+' ('+bestPole[1].toFixed(1)+'\u00b0)'
+  +'   \u00b7   \u2600 '+oraSolare(lst,raSole)+'  '+(altSole>=0?'+':'')+altSole.toFixed(1)+
+    '\u00b0  az '+Math.round(azSole)+'\u00b0'+testoLuna
+  +(eclissi?'   \u00b7   \u26A0 ECLISSI '+eclissi.tipo.toUpperCase()+' \u2014 '+eclissi.nome+
+    ' (lat. lunare '+eclissi.beta.toFixed(2)+'\u00b0)':'');
+ document.getElementById('pole').textContent=poleTxt;
+ disponiScritte();
+ updateHud();
+}
+init();
+</script>
+</body>
+</html>
