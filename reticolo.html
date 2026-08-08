@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Il Reticolo — georeferenziazione di foto storiche · Precessio</title>
+<style>
+:root{
+  --fondo:#0c0a07;
+  --fondo2:#141009;
+  --pannello:#1a150d;
+  --oro:#d8b25a;
+  --oro-tenue:#8a723a;
+  --oro-vivo:#f2d38a;
+  --sabbia:#c9bda4;
+  --verde:#7fbf6a;
+  --rosso:#d4694f;
+  --azzurro:#6aa9d4;
+  --bordo:#3a2f1a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--fondo);color:var(--sabbia);
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;overflow:hidden}
+.dato{font-family:"SF Mono",Menlo,Consolas,"DejaVu Sans Mono",monospace;font-variant-numeric:tabular-nums}
+
+#app{display:grid;grid-template-columns:290px 1fr 300px;grid-template-rows:auto 1fr;height:100%}
+header{grid-column:1/4;display:flex;align-items:baseline;gap:14px;padding:8px 14px;
+  background:linear-gradient(180deg,#191308,#0e0b07);border-bottom:1px solid var(--bordo)}
+header h1{margin:0;font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--oro);font-weight:600}
+header .sub{font-size:12px;color:var(--oro-tenue);letter-spacing:.04em}
+header .stato{margin-left:auto;font-size:11px;color:var(--sabbia);opacity:.75}
+
+aside{background:var(--pannello);border-right:1px solid var(--bordo);overflow-y:auto;padding:10px}
+aside.destra{border-right:none;border-left:1px solid var(--bordo)}
+h2{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--oro-tenue);
+  margin:14px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--bordo)}
+h2:first-child{margin-top:2px}
+
+#tela{position:relative;background:#000;overflow:hidden}
+canvas{display:block;position:absolute;inset:0}
+#vuoto{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;color:var(--oro-tenue);text-align:center;padding:40px;pointer-events:none}
+#vuoto b{color:var(--oro);font-size:15px;letter-spacing:.08em}
+#vuoto span{font-size:12.5px;max-width:420px;line-height:1.55}
+
+.riga{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 4px;border-radius:3px;cursor:pointer}
+.riga:hover{background:#241d10}
+.riga.sel{background:#2e2411;outline:1px solid var(--oro-tenue)}
+.riga .nome{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.riga .pin{width:15px;text-align:center;font-size:11px}
+.riga.posato .nome{color:var(--oro-vivo)}
+.riga .res{font-size:10px;opacity:.75;font-family:monospace}
+.gruppo{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--oro-tenue);margin:8px 0 2px}
+
+button{font-family:inherit;font-size:12px;color:var(--sabbia);background:#241c10;
+  border:1px solid var(--bordo);border-radius:3px;padding:5px 9px;cursor:pointer}
+button:hover{border-color:var(--oro-tenue);color:var(--oro-vivo)}
+button.primario{background:#3a2c12;border-color:var(--oro-tenue);color:var(--oro)}
+button:disabled{opacity:.35;cursor:default}
+.bottoniera{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+
+label.campo{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;margin:5px 0}
+label.campo input[type=number],label.campo select{width:88px;background:#0e0b07;color:var(--oro-vivo);
+  border:1px solid var(--bordo);border-radius:3px;padding:3px 5px;font-family:monospace;font-size:11.5px}
+label.spunta{display:flex;align-items:center;gap:7px;font-size:11.5px;margin:4px 0;cursor:pointer}
+
+table.esito{width:100%;border-collapse:collapse;font-size:11.5px}
+table.esito td{padding:2px 0;vertical-align:top}
+table.esito td.v{text-align:right;font-family:monospace;color:var(--oro-vivo)}
+.nota{font-size:11px;line-height:1.5;color:#a2977f;margin:6px 0}
+.avviso{font-size:11px;line-height:1.5;border-left:2px solid var(--rosso);padding:5px 8px;margin:8px 0;
+  background:#20130e;color:#e0b9ac}
+.buono{border-left-color:var(--verde);background:#131c10;color:#c2ddb6}
+.tacca{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--oro-tenue)}
+input[type=file]{display:none}
+::-webkit-scrollbar{width:9px}::-webkit-scrollbar-track{background:#0e0b07}
+::-webkit-scrollbar-thumb{background:#3a2f1a;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Il Reticolo</h1>
+    <span class="sub">georeferenziazione di foto storiche · suite Precessio</span>
+    <span class="stato" id="stato">nessuna immagine caricata</span>
+  </header>
+
+  <aside class="sinistra">
+    <h2>Immagine</h2>
+    <div class="bottoniera">
+      <button class="primario" id="btnApri">Apri una foto…</button>
+      <button id="btnScheda">Scheda JSON</button>
+    </div>
+    <input type="file" id="filePic" accept="image/*">
+    <input type="file" id="fileJson" accept=".json,application/json">
+    <div class="nota">Si può anche trascinare la foto sulla tela, o incollarla con Ctrl+V. L'immagine resta sul tuo computer: niente viene caricato da nessuna parte.</div>
+
+    <h2>Punti di appoggio</h2>
+    <div class="nota">Scegli un punto, poi clicca sulla foto dove lo vedi. Trascina per correggere, frecce per lo scarto fine.</div>
+    <div id="elenco"></div>
+
+    <h2>Quote (m s.l.m.)</h2>
+    <div class="nota">Contano solo le <b>differenze</b>: Chefren siede ~10 m più in alto di Cheope, e il dosso ~13. Sono stime dichiarate — sostituiscile appena le misuri.</div>
+    <label class="campo">Base di Cheope <span class="tacca">stima</span><input type="number" id="q_cheope" value="60" step="0.5"></label>
+    <label class="campo">Base di Chefren <span class="tacca">stima</span><input type="number" id="q_chefren" value="70" step="0.5"></label>
+    <label class="campo">Base di Micerino <span class="tacca">stima</span><input type="number" id="q_micerino" value="66" step="0.5"></label>
+    <label class="campo">Piano della Sfinge <span class="tacca">stima</span><input type="number" id="q_sfinge" value="22" step="0.5"></label>
+    <label class="campo">Dosso <span class="tacca">misurato</span><input type="number" id="q_dosso" value="73" step="0.5"></label>
+    <label class="campo">Cima di Cheope<input type="number" id="q_hCheope" value="138.8" step="0.1"></label>
+    <div class="nota">138,8 m è la cima spogliata: è quella che si vede in tutte le foto storiche. Metti 146,6 solo se stai lavorando su una ricostruzione.</div>
+
+    <h2>Dove prendere le foto</h2>
+    <div class="nota">Su Wikimedia Commons, categoria <i>Aerial photographs of Giza pyramid complex</i>:
+    <br>· <b>Spelterini, 21 novembre 1904</b>, pallone a ~600 m — l'unica ripresa aerea anteriore agli scavi di Junker (1912) e Reisner (1905). Segnatura CH-NB · EAD-WEHR-32044-B.
+    <br>· <b>ETH-BIB, volo del Kilimangiaro 1929-30</b> (Mittelholzer): sette riprese a 4961 px, una dichiarata "aus 400 m Höhe" (LBS MH02-07-0154). Posteriori a Junker, ma nitidissime: usale per imparare a posare i punti.
+    <br>· <b>LOC matpc</b> 12378 e 23055, quasi a piombo, 5000 px.
+    <br>I file grossi sono TIFF: sulla pagina di Commons usa "Scarica" e scegli JPEG, altrimenti il browser non li apre.</div>
+  </aside>
+
+  <div id="tela">
+    <canvas id="cv"></canvas>
+    <div id="vuoto">
+      <b>Apri una foto aerea di Giza</b>
+      <span>Poi indica sulla foto almeno quattro spigoli di base e due cime di piramide. Il Reticolo calcola la camera che ha scattato quella foto e ti dice <i>dove deve cadere</i> il punto della seconda sfinge — prima che tu lo guardi.</span>
+    </div>
+  </div>
+
+  <aside class="destra">
+    <h2>Soluzione</h2>
+    <table class="esito" id="esito"><tr><td class="nota">In attesa di punti.</td></tr></table>
+    <div id="giudizio"></div>
+
+    <h2>Bersagli</h2>
+    <div id="bersagli"></div>
+
+    <h2>Incertezza</h2>
+    <label class="campo">Errore di clic (px)<input type="number" id="sigma" value="3" step="0.5" min="0.5"></label>
+    <label class="campo">Estrazioni<input type="number" id="mcN" value="300" step="50" min="50"></label>
+    <div class="bottoniera"><button id="btnMC">Misura l'incertezza</button></div>
+    <div id="esitoMC"></div>
+
+    <h2>Disegno</h2>
+    <label class="spunta"><input type="checkbox" id="cbBasi" checked> Basi ricostruite delle piramidi</label>
+    <label class="spunta"><input type="checkbox" id="cbLinea" checked> Prolungamento del lato nord</label>
+    <label class="spunta"><input type="checkbox" id="cbLente" checked> Lente d'ingrandimento</label>
+    <label class="campo">Ingrandimento della lente<input type="number" id="lenteF" value="4" step="1" min="1" max="20"></label>
+    <div class="nota">È <b>relativo a quello che vedi</b>: 4 vuol dire quattro volte più grande della tela. Se sei rimpicciolito su tutta la foto, la lente resta rimpicciolita anche lei — <b>prima zooma con la rotellina sulla piramide</b>, poi usa la lente per l'ultimo pixel.</div>
+    <label class="spunta"><input type="checkbox" id="cbInverso"> Modo inverso: leggi le coordinate</label>
+    <div class="nota">Il modo inverso va usato <b>dopo</b> aver guardato il punto calcolato, non prima: cercare l'anomalia e poi localizzarla è esattamente il passaggio che contestiamo altrove.</div>
+    <div class="bottoniera">
+      <button class="primario" id="btnRilievo">P — scatta rilievo</button>
+      <button id="btnCarica">Riapri una scheda</button>
+      <button id="btnPulisci">Togli tutti i punti</button>
+    </div>
+  </aside>
+</div>
+<script>
+'use strict';
+/* ============================================================
+   IL RETICOLO — georeferenziazione di foto storiche
+   suite Precessio · metodo: camera proiettiva P = [H | w]
+   Ogni coordinata porta la sua FONTE. Le stime sono dichiarate.
+   ============================================================ */
+
+/* ---------- 1. CATALOGO DEI PUNTI ---------- */
+const MIS = 'misurato da Ade, Google Earth Pro, 21/7/2026';
+const MIS5 = 'misurato da Ade, Google Earth Pro, 5/8/2026';
+const STIMA = 'STIMA dichiarata, da misurare';
+
+/* Quote delle basi in metri s.l.m. Sono STIME, tranne il dosso.
+   Contano solo le DIFFERENZE fra loro: sono modificabili dal pannello. */
+const Q = {cheope:60, chefren:70, micerino:66, sfinge:22, dosso:73, hCheope:138.8};
+
+const CAT = [
+  {id:'che_no', nome:'Cheope \u00b7 spigolo NO', gr:'Cheope', lat:29.980156, lon:31.133019, k:'cheope', t:'suolo', f:MIS},
+  {id:'che_ne', nome:'Cheope \u00b7 spigolo NE', gr:'Cheope', lat:29.980181, lon:31.135356, k:'cheope', t:'suolo', f:MIS},
+  {id:'che_se', nome:'Cheope \u00b7 spigolo SE', gr:'Cheope', lat:29.978119, lon:31.135364, k:'cheope', t:'suolo', f:MIS},
+  {id:'che_so', nome:'Cheope \u00b7 spigolo SO', gr:'Cheope', lat:29.978114, lon:31.133058, k:'cheope', t:'suolo', f:MIS},
+  {id:'che_cima', nome:'Cheope \u00b7 cima', gr:'Cheope', lat:29.979142, lon:31.134199, k:'cimaCheope', t:'cima', f:'centro '+MIS+'; altezza da rilievi pubblicati'},
+
+  {id:'chf_no', nome:'Chefren \u00b7 spigolo NO', gr:'Chefren', lat:29.976931, lon:31.129647, k:'chefren', t:'suolo', f:MIS},
+  {id:'chf_ne', nome:'Chefren \u00b7 spigolo NE', gr:'Chefren', lat:29.976939, lon:31.131869, k:'chefren', t:'suolo', f:MIS},
+  {id:'chf_se', nome:'Chefren \u00b7 spigolo SE', gr:'Chefren', lat:29.975053, lon:31.131853, k:'chefren', t:'suolo', f:MIS},
+  {id:'chf_so', nome:'Chefren \u00b7 spigolo SO', gr:'Chefren', lat:29.975039, lon:31.129633, k:'chefren', t:'suolo', f:MIS},
+  {id:'chf_cima', nome:'Chefren \u00b7 cima', gr:'Chefren', lat:29.975990, lon:31.130751, k:'cimaChefren', t:'cima', f:'centro '+MIS+'; altezza 136,4 m, rilievi pubblicati'},
+
+  {id:'mic_no', nome:'Micerino \u00b7 spigolo NO', gr:'Micerino', lat:29.972903, lon:31.127792, k:'micerino', t:'suolo', f:MIS},
+  {id:'mic_ne', nome:'Micerino \u00b7 spigolo NE', gr:'Micerino', lat:29.972908, lon:31.128747, k:'micerino', t:'suolo', f:MIS},
+  {id:'mic_se', nome:'Micerino \u00b7 spigolo SE', gr:'Micerino', lat:29.972036, lon:31.128778, k:'micerino', t:'suolo', f:MIS},
+  {id:'mic_so', nome:'Micerino \u00b7 spigolo SO', gr:'Micerino', lat:29.972056, lon:31.127767, k:'micerino', t:'suolo', f:MIS},
+  {id:'mic_cima', nome:'Micerino \u00b7 cima', gr:'Micerino', lat:29.972476, lon:31.128271, k:'cimaMicerino', t:'cima', f:'centro '+MIS+'; altezza ~61 m'},
+
+  {id:'g1a', nome:'G1-a \u00b7 centro', gr:'Satelliti', lat:29.978840, lon:31.136229, k:'cheope', t:'suolo', f:MIS},
+  {id:'g1b', nome:'G1-b \u00b7 centro', gr:'Satelliti', lat:29.978294, lon:31.136242, k:'cheope', t:'suolo', f:MIS},
+  {id:'g1c', nome:'G1-c \u00b7 centro', gr:'Satelliti', lat:29.977831, lon:31.136231, k:'cheope', t:'suolo', f:MIS},
+  {id:'g3a', nome:'G3-a \u00b7 centro', gr:'Satelliti', lat:29.971608, lon:31.128322, k:'micerino', t:'suolo', f:MIS},
+  {id:'g3b', nome:'G3-b \u00b7 centro', gr:'Satelliti', lat:29.971593, lon:31.127812, k:'micerino', t:'suolo', f:MIS},
+  {id:'g3c', nome:'G3-c \u00b7 centro', gr:'Satelliti', lat:29.971583, lon:31.127347, k:'micerino', t:'suolo', f:MIS},
+
+  {id:'sfinge', nome:'Sfinge \u00b7 centro', gr:'Prova indipendente', lat:29.97528, lon:31.13757, k:'sfinge', t:'suolo', f:MIS+'; quota '+STIMA}
+];
+
+const BER = [
+  {id:'piras',    nome:'Punto di Piras',       lat:29.98003,  lon:31.12626,  k:'dosso', f:'Piras, pag. 18'},
+  {id:'cresta_o', nome:'Cresta del dosso \u00b7 O', lat:29.980031, lon:31.125975, k:'dosso', f:MIS5},
+  {id:'cresta_e', nome:'Cresta del dosso \u00b7 E', lat:29.979969, lon:31.126922, k:'dosso', f:MIS5},
+  {id:'spec',     nome:'Speculare teorico',    lat:29.98203,  lon:31.12953,  k:'dosso', f:'calcolato; quota '+STIMA}
+];
+
+// quota assoluta di un elemento, in metri s.l.m.
+function quotaK(k){
+  if(k==='cimaCheope')   return Q.cheope   + Q.hCheope;
+  if(k==='cimaChefren')  return Q.chefren  + 136.4;
+  if(k==='cimaMicerino') return Q.micerino + 61.0;
+  return Q[k];
+}
+
+/* ---------- 2. GEODESIA ---------- */
+const LAT0 = 29.979142, LON0 = 31.134199;          // centro di Cheope (misurato)
+const _f = LAT0*Math.PI/180;
+const MLAT = 111132.92 - 559.82*Math.cos(2*_f) + 1.175*Math.cos(4*_f) - 0.0023*Math.cos(6*_f);
+const MLON = 111412.84*Math.cos(_f) - 93.5*Math.cos(3*_f) + 0.118*Math.cos(5*_f);
+const EN  = (lat,lon)=>({E:(lon-LON0)*MLON, N:(lat-LAT0)*MLAT});
+const LL  = (E,N)=>({lat:LAT0+N/MLAT, lon:LON0+E/MLON});
+const gms = (v,pos,neg)=>{const s=v<0?neg:pos;v=Math.abs(v);const g=Math.floor(v),m=Math.floor((v-g)*60),
+  se=((v-g)*60-m)*60;return `${g}°${String(m).padStart(2,'0')}'${se.toFixed(2).padStart(5,'0')}"${s}`;};
+
+/* ---------- 3. ALGEBRA ---------- */
+function solveLin(A,b,n){
+  const M=A.slice(), y=b.slice();
+  for(let i=0;i<n;i++){
+    let piv=i;
+    for(let r=i+1;r<n;r++) if(Math.abs(M[r*n+i])>Math.abs(M[piv*n+i])) piv=r;
+    if(Math.abs(M[piv*n+i])<1e-13) return null;
+    if(piv!==i){for(let c=0;c<n;c++){const t=M[i*n+c];M[i*n+c]=M[piv*n+c];M[piv*n+c]=t;}
+      const t=y[i];y[i]=y[piv];y[piv]=t;}
+    for(let r=i+1;r<n;r++){
+      const f=M[r*n+i]/M[i*n+i]; if(!f) continue;
+      for(let c=i;c<n;c++) M[r*n+c]-=f*M[i*n+c];
+      y[r]-=f*y[i];
+    }
+  }
+  const x=new Array(n).fill(0);
+  for(let i=n-1;i>=0;i--){let s=y[i];for(let c=i+1;c<n;c++)s-=M[i*n+c]*x[c];x[i]=s/M[i*n+i];}
+  return x;
+}
+function lsq(rows,rhs,n){
+  const A=new Array(n*n).fill(0), b=new Array(n).fill(0);
+  for(let k=0;k<rows.length;k++){
+    const r=rows[k], y=rhs[k];
+    for(let i=0;i<n;i++){b[i]+=r[i]*y;for(let j=0;j<n;j++)A[i*n+j]+=r[i]*r[j];}
+  }
+  return solveLin(A,b,n);
+}
+
+/* ---------- 4. CAMERA  P = [H | w] ----------
+   p = [h1..h8, w1,w2,w3]; punto (X,Y,Z) normalizzato -> pixel normalizzati  */
+function proj(p,X,Y,Z){
+  const z = p[6]*X + p[7]*Y + 1 + p[10]*Z;
+  return [ (p[0]*X+p[1]*Y+p[2]+p[8]*Z)/z, (p[3]*X+p[4]*Y+p[5]+p[9]*Z)/z ];
+}
+function stimaH(pt){
+  if(pt.length<4) return null;
+  const rows=[],rhs=[];
+  for(const q of pt){
+    rows.push([q.X,q.Y,1,0,0,0,-q.u*q.X,-q.u*q.Y]); rhs.push(q.u);
+    rows.push([0,0,0,q.X,q.Y,1,-q.v*q.X,-q.v*q.Y]); rhs.push(q.v);
+  }
+  return lsq(rows,rhs,8);
+}
+function stimaW(h,pt){
+  if(pt.length<2) return null;
+  const rows=[],rhs=[];
+  for(const q of pt){
+    const q1=h[0]*q.X+h[1]*q.Y+h[2], q2=h[3]*q.X+h[4]*q.Y+h[5], q3=h[6]*q.X+h[7]*q.Y+1;
+    rows.push([q.Z,0,-q.u*q.Z]); rhs.push(q.u*q3-q1);
+    rows.push([0,q.Z,-q.v*q.Z]); rhs.push(q.v*q3-q2);
+  }
+  return lsq(rows,rhs,3);
+}
+function residui(p,pt){
+  const r=[];
+  for(const q of pt){const[a,b]=proj(p,q.X,q.Y,q.Z);r.push(a-q.u,b-q.v);}
+  return r;
+}
+const costo=(p,pt)=>residui(p,pt).reduce((s,x)=>s+x*x,0);
+
+function raffina(p0,pt,mask,iter){
+  let p=p0.slice(), lam=1e-3, c=costo(p,pt);
+  const n=mask.length;
+  for(let it=0;it<iter;it++){
+    const r=residui(p,pt), m=r.length, J=[];
+    for(let j=0;j<n;j++){
+      const k=mask[j], hh=Math.max(1e-7,Math.abs(p[k])*1e-6);
+      const pp=p.slice(); pp[k]+=hh; const rp=residui(pp,pt);
+      const pm=p.slice(); pm[k]-=hh; const rm=residui(pm,pt);
+      const col=new Array(m);
+      for(let i=0;i<m;i++) col[i]=(rp[i]-rm[i])/(2*hh);
+      J.push(col);
+    }
+    const A=new Array(n*n).fill(0), b=new Array(n).fill(0);
+    for(let i=0;i<m;i++)
+      for(let a=0;a<n;a++){
+        b[a]-=J[a][i]*r[i];
+        for(let z=0;z<n;z++) A[a*n+z]+=J[a][i]*J[z][i];
+      }
+    let ok=false;
+    for(let t=0;t<8&&!ok;t++){
+      const Ad=A.slice();
+      for(let a=0;a<n;a++) Ad[a*n+a]*=(1+lam);
+      const d=solveLin(Ad,b,n);
+      if(!d){lam*=10;continue;}
+      const pn=p.slice(); for(let j=0;j<n;j++) pn[mask[j]]+=d[j];
+      const cn=costo(pn,pt);
+      if(cn<c){p=pn;c=cn;lam=Math.max(lam/3,1e-10);ok=true;} else lam*=6;
+    }
+    if(!ok) break;
+  }
+  return p;
+}
+
+function risolvi(pt){
+  const suolo=pt.filter(q=>q.piano), alti=pt.filter(q=>!q.piano);
+  const base = suolo.length>=4 ? suolo : pt;
+  const h = stimaH(base);
+  if(!h) return null;
+  let w = stimaW(h,alti) || [0,0,0];
+  let p = h.concat(w);
+  let modo;
+  if(alti.length>=2 && pt.length>=6){
+    p = raffina(p,pt,[0,1,2,3,4,5,6,7,8,9,10],45); modo='completo';
+  } else if(suolo.length>=4){
+    p = h.concat([0,0,0]);
+    p = raffina(p,suolo,[0,1,2,3,4,5,6,7],30); modo='piano';
+  } else return null;
+  return {p, modo, nSuolo:suolo.length, nAlti:alti.length};
+}
+
+function centroCamera(p){
+  const c1=[p[0],p[3],p[6]], c2=[p[1],p[4],p[7]], c3=[p[2],p[5],1], w=[p[8],p[9],p[10]];
+  const det=(a,b,c)=> a[0]*(b[1]*c[2]-c[1]*b[2]) - b[0]*(a[1]*c[2]-c[1]*a[2]) + c[0]*(a[1]*b[2]-b[1]*a[2]);
+  const C4=-det(c1,c2,w);
+  if(Math.abs(C4)<1e-13) return null;
+  return [det(c2,w,c3)/C4, -det(c1,w,c3)/C4, det(c1,c2,c3)/C4];
+}
+
+/* ---------- 5. STATO ---------- */
+const S = {
+  img:null, nomeFile:'', SU:1, cx:0, cy:0, SW:400,
+  vista:{s:1,tx:0,ty:0},
+  segni:{},            // id -> {u,v} in pixel immagine
+  usa:{},              // id -> bool (dentro il calcolo)
+  sel:null, trascina:null, pan:null,
+  sol:null, res:{}, loo:{}, mc:null,
+  mouse:null
+};
+CAT.forEach(c=>S.usa[c.id]=true);
+
+const $ = s=>document.querySelector(s);
+const cv=$('#cv'), ctx=cv.getContext('2d');
+
+function mondo(c){
+  const e=EN(c.lat,c.lon);
+  return {X:e.E/S.SW, Y:e.N/S.SW, Z:(quotaK(c.k)-Q.cheope)/S.SW};
+}
+function mondoB(b){
+  const e=EN(b.lat,b.lon);
+  return {X:e.E/S.SW, Y:e.N/S.SW, Z:(quotaK(b.k)-Q.cheope)/S.SW};
+}
+const toPx = a=>[a[0]*S.SU+S.cx, a[1]*S.SU+S.cy];
+const toNorm = (u,v)=>[(u-S.cx)/S.SU,(v-S.cy)/S.SU];
+function proiettaPx(p,m){ return toPx(proj(p,m.X,m.Y,m.Z)); }
+
+function puntiAttivi(){
+  const out=[];
+  for(const c of CAT){
+    const s=S.segni[c.id]; if(!s||!S.usa[c.id]) continue;
+    const m=mondo(c), n=toNorm(s.u,s.v);
+    out.push({id:c.id,X:m.X,Y:m.Y,Z:m.Z,u:n[0],v:n[1],piano:c.t==='suolo'});
+  }
+  return out;
+}
+
+/* ---------- 6. CALCOLO COMPLETO ---------- */
+function ricalcola(){
+  S.res={}; S.loo={}; S.mc=null;
+  const pt=puntiAttivi();
+  S.sol = pt.length>=4 ? risolvi(pt) : null;
+  if(S.sol){
+    // residui di adattamento
+    for(const q of pt){
+      const [a,b]=proj(S.sol.p,q.X,q.Y,q.Z);
+      const [pu,pv]=toPx([a,b]), s=S.segni[q.id];
+      S.res[q.id]=Math.hypot(pu-s.u,pv-s.v);
+    }
+    // lascia-fuori-uno
+    if(pt.length>=6){
+      for(const q of pt){
+        const r=risolvi(pt.filter(z=>z.id!==q.id));
+        if(!r) continue;
+        const [a,b]=proj(r.p,q.X,q.Y,q.Z);
+        const [pu,pv]=toPx([a,b]), s=S.segni[q.id];
+        S.loo[q.id]=Math.hypot(pu-s.u,pv-s.v);
+      }
+    }
+  }
+  disegnaElenco(); mostraEsito(); mostraBersagli(); disegna();
+}
+
+function scalaMetri(p,m){ // metri per pixel attorno a un punto del mondo
+  const a=proiettaPx(p,m);
+  const de=proiettaPx(p,{X:m.X+1/S.SW,Y:m.Y,Z:m.Z});
+  const dn=proiettaPx(p,{X:m.X,Y:m.Y+1/S.SW,Z:m.Z});
+  const pe=Math.hypot(de[0]-a[0],de[1]-a[1]), pn=Math.hypot(dn[0]-a[0],dn[1]-a[1]);
+  const px=(pe+pn)/2;
+  return px>1e-9 ? 1/px : NaN;
+}
+
+/* ---------- 7. MONTE CARLO ---------- */
+const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+
+function monteCarlo(){
+  const pt=puntiAttivi();
+  if(pt.length<4||!S.sol){S.mc=null;return;}
+  const sig=parseFloat($('#sigma').value)/S.SU;
+  const N=Math.max(50,Math.min(3000,parseInt($('#mcN').value)||300));
+  const nubi={};
+  BER.forEach(b=>nubi[b.id]=[]);
+  let riusciti=0;
+  for(let k=0;k<N;k++){
+    const pert=pt.map(q=>({...q,u:q.u+gauss()*sig,v:q.v+gauss()*sig}));
+    const r=risolvi(pert);
+    if(!r) continue;
+    riusciti++;
+    for(const b of BER){
+      const m=mondoB(b);
+      nubi[b.id].push(toPx(proj(r.p,m.X,m.Y,m.Z)));
+    }
+  }
+  const out={n:riusciti,ell:{}};
+  for(const b of BER){
+    const c=nubi[b.id]; if(c.length<10) continue;
+    let mx=0,my=0; c.forEach(q=>{mx+=q[0];my+=q[1];}); mx/=c.length; my/=c.length;
+    let sxx=0,syy=0,sxy=0;
+    c.forEach(q=>{const dx=q[0]-mx,dy=q[1]-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+    sxx/=c.length; syy/=c.length; sxy/=c.length;
+    const tr=sxx+syy, dt=sxx*syy-sxy*sxy;
+    const l1=tr/2+Math.sqrt(Math.max(0,tr*tr/4-dt)), l2=tr/2-Math.sqrt(Math.max(0,tr*tr/4-dt));
+    const ang=0.5*Math.atan2(2*sxy,sxx-syy);
+    const k95=Math.sqrt(5.991);
+    out.ell[b.id]={mx,my,a:k95*Math.sqrt(Math.max(l1,0)),b:k95*Math.sqrt(Math.max(l2,0)),ang,
+      rms:Math.sqrt(sxx+syy)};
+  }
+  S.mc=out;
+  mostraMC(); disegna();
+}
+
+/* ---------- 8. DISEGNO ---------- */
+function ridimensiona(){
+  const r=$('#tela').getBoundingClientRect();
+  const d=window.devicePixelRatio||1;
+  cv.width=r.width*d; cv.height=r.height*d;
+  cv.style.width=r.width+'px'; cv.style.height=r.height+'px';
+  ctx.setTransform(d,0,0,d,0,0);
+  disegna();
+}
+const S2C = (u,v)=>[u*S.vista.s+S.vista.tx, v*S.vista.s+S.vista.ty];
+const C2S = (x,y)=>[(x-S.vista.tx)/S.vista.s, (y-S.vista.ty)/S.vista.s];
+
+let _atteso=false;
+function chiediDisegno(){
+  if(_atteso) return;
+  _atteso=true;
+  requestAnimationFrame(()=>{_atteso=false;disegna();});
+}
+function disegna(){
+  const w=cv.width/(window.devicePixelRatio||1), h=cv.height/(window.devicePixelRatio||1);
+  ctx.clearRect(0,0,w,h);
+  if(!S.img) return;
+  ctx.imageSmoothingEnabled = S.vista.s<1.5;
+  ctx.save();
+  ctx.translate(S.vista.tx,S.vista.ty); ctx.scale(S.vista.s,S.vista.s);
+  ctx.drawImage(S.img,0,0);
+  ctx.restore();
+
+  const p=S.sol?S.sol.p:null;
+
+  if(p){
+    if($('#cbBasi').checked) disegnaBasi(p);
+    if($('#cbLinea').checked) disegnaLinea(p);
+    disegnaBersagli(p);
+  }
+  disegnaSegni(p);
+  if($('#cbLente').checked && S.mouse) disegnaLente();
+}
+
+function poliLinea(p,punti,colore,largh,tratteg){
+  ctx.save(); ctx.strokeStyle=colore; ctx.lineWidth=largh;
+  if(tratteg) ctx.setLineDash(tratteg);
+  ctx.beginPath();
+  punti.forEach((m,i)=>{
+    const [a,b]=S2C(...proiettaPx(p,m));
+    i?ctx.lineTo(a,b):ctx.moveTo(a,b);
+  });
+  ctx.stroke(); ctx.restore();
+}
+
+function disegnaBasi(p){
+  const gruppi=[['che_no','che_ne','che_se','che_so'],
+                ['chf_no','chf_ne','chf_se','chf_so'],
+                ['mic_no','mic_ne','mic_se','mic_so']];
+  for(const g of gruppi){
+    const ms=g.map(id=>mondo(CAT.find(c=>c.id===id)));
+    poliLinea(p,ms.concat([ms[0]]),'rgba(216,178,90,.55)',1.4);
+  }
+}
+
+function disegnaLinea(p){
+  const no=EN(29.980156,31.133019), ne=EN(29.980181,31.135356);
+  let dx=no.E-ne.E, dy=no.N-ne.N; const L=Math.hypot(dx,dy); dx/=L; dy/=L; // verso OVEST
+  const z=0;
+  const camp=[];
+  for(let d=0; d<=900; d+=25) camp.push({X:(no.E+dx*d)/S.SW, Y:(no.N+dy*d)/S.SW, Z:z});
+  poliLinea(p,camp,'rgba(106,169,212,.75)',1.4,[7,5]);
+  const lato=230.36;
+  ctx.save(); ctx.fillStyle='#6aa9d4'; ctx.font='10px monospace';
+  for(let k=1;k<=3;k++){
+    const d=k*lato;
+    const [a,b]=S2C(...proiettaPx(p,{X:(no.E+dx*d)/S.SW,Y:(no.N+dy*d)/S.SW,Z:z}));
+    ctx.beginPath(); ctx.arc(a,b,3,0,7); ctx.fill();
+    ctx.fillText(k+' lato'+(k>1?'i':''),a+6,b-4);
+  }
+  const [a,b]=S2C(...proiettaPx(p,{X:(no.E+dx*651.9)/S.SW,Y:(no.N+dy*651.9)/S.SW,Z:z}));
+  ctx.strokeStyle='#6aa9d4'; ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.moveTo(a,b-9); ctx.lineTo(a,b+9); ctx.stroke();
+  ctx.fillText('651,9 m = 2,83 lati',a+7,b+12);
+  ctx.restore();
+}
+
+function disegnaBersagli(p){
+  for(const b of BER){
+    const m=mondoB(b);
+    const [a,c]=S2C(...proiettaPx(p,m));
+    const el=S.mc&&S.mc.ell[b.id];
+    if(el){
+      const [ex,ey]=S2C(el.mx,el.my);
+      ctx.save(); ctx.translate(ex,ey); ctx.rotate(el.ang);
+      ctx.strokeStyle='rgba(212,105,79,.85)'; ctx.lineWidth=1.3;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.ellipse(0,0,el.a*S.vista.s,el.b*S.vista.s,0,0,7); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.strokeStyle= b.id==='piras' ? '#f2d38a' : 'rgba(242,211,138,.65)';
+    ctx.lineWidth= b.id==='piras' ? 2 : 1.3;
+    const r=b.id==='piras'?11:7;
+    ctx.beginPath(); ctx.arc(a,c,r,0,7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(a-r-6,c); ctx.lineTo(a-3,c);
+    ctx.moveTo(a+3,c); ctx.lineTo(a+r+6,c);
+    ctx.moveTo(a,c-r-6); ctx.lineTo(a,c-3);
+    ctx.moveTo(a,c+3); ctx.lineTo(a,c+r+6); ctx.stroke();
+    ctx.fillStyle=ctx.strokeStyle; ctx.font='11px monospace';
+    ctx.fillText(b.nome,a+r+9,c-r);
+    ctx.restore();
+  }
+}
+
+function disegnaSegni(p){
+  for(const c of CAT){
+    const s=S.segni[c.id]; if(!s) continue;
+    const [a,b]=S2C(s.u,s.v);
+    const attivo=S.usa[c.id];
+    ctx.save();
+    ctx.strokeStyle= attivo ? (c.t==='cima'?'#7fbf6a':'#d8b25a') : '#8a723a';
+    ctx.lineWidth=1.6;
+    ctx.beginPath(); ctx.moveTo(a-8,b); ctx.lineTo(a-2,b); ctx.moveTo(a+2,b); ctx.lineTo(a+8,b);
+    ctx.moveTo(a,b-8); ctx.lineTo(a,b-2); ctx.moveTo(a,b+2); ctx.lineTo(a,b+8); ctx.stroke();
+    if(S.sel===c.id){ ctx.setLineDash([2,3]); ctx.beginPath(); ctx.arc(a,b,12,0,7); ctx.stroke(); }
+    ctx.restore();
+    // scarto: dal segno alla posizione riproiettata
+    if(p){
+      const [qa,qb]=S2C(...proiettaPx(p,mondo(c)));
+      const d=Math.hypot(qa-a,qb-b);
+      if(d>1.5){
+        ctx.save(); ctx.strokeStyle= attivo?'rgba(212,105,79,.9)':'rgba(106,169,212,.9)';
+        ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(a,b); ctx.lineTo(qa,qb); ctx.stroke();
+        ctx.beginPath(); ctx.arc(qa,qb,3,0,7); ctx.stroke(); ctx.restore();
+      }
+    }
+  }
+}
+
+function disegnaLente(){
+  const m=S.mouse;
+  const fatt = parseFloat(($('#lenteF')||{}).value) || 4;
+  // l'ingrandimento e' RELATIVO a quello che stai gia' vedendo: 4x significa
+  // "quattro volte piu' grande della tela". Oltre 12x dei pixel veri c'e' solo grana.
+  const ing = Math.max(1.2, Math.min(fatt*S.vista.s, 12));
+  const R=95;
+  const w=cv.clientWidth, h=cv.clientHeight;
+  let lx = m.x + R+40, ly = m.y - R-40;
+  if(lx+R>w-6) lx = m.x - R-40;
+  if(ly-R<6)   ly = m.y + R+40;
+  const [iu,iv]=C2S(m.x,m.y);
+  const dentro = iu>=0 && iv>=0 && iu<=S.img.width && iv<=S.img.height;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(lx,ly,R,0,7); ctx.clip();
+  ctx.fillStyle='#0c0a07'; ctx.fillRect(lx-R,ly-R,2*R,2*R);
+  if(dentro){
+    ctx.imageSmoothingEnabled = ing<2.5;
+    ctx.translate(lx,ly); ctx.scale(ing,ing); ctx.translate(-iu,-iv);
+    ctx.drawImage(S.img,0,0);
+  }
+  ctx.restore();
+  if(!dentro){
+    ctx.save(); ctx.fillStyle='#8a723a'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText('fuori dalla foto',lx,ly+4); ctx.restore();
+  }
+  ctx.save();
+  ctx.strokeStyle='#d8b25a'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(lx,ly,R,0,7); ctx.stroke();
+  ctx.strokeStyle='rgba(216,178,90,.9)'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(lx-R,ly); ctx.lineTo(lx-9,ly); ctx.moveTo(lx+9,ly); ctx.lineTo(lx+R,ly);
+  ctx.moveTo(lx,ly-R); ctx.lineTo(lx,ly-9); ctx.moveTo(lx,ly+9); ctx.lineTo(lx,ly+R);
+  ctx.stroke();
+  ctx.fillStyle='#8a723a'; ctx.font='9px monospace'; ctx.textAlign='left';
+  ctx.fillText(ing.toFixed(1)+'\u00d7 dei pixel veri',lx-R+10,ly+R-9);
+  ctx.restore();
+}
+
+/* ---------- 9. PANNELLI ---------- */
+function disegnaElenco(){
+  const el=$('#elenco'); el.innerHTML='';
+  let gr=null;
+  for(const c of CAT){
+    if(c.gr!==gr){gr=c.gr; const d=document.createElement('div');d.className='gruppo';d.textContent=gr;el.appendChild(d);}
+    const r=document.createElement('div');
+    r.className='riga'+(S.sel===c.id?' sel':'')+(S.segni[c.id]?' posato':'');
+    const cb=document.createElement('input');
+    cb.type='checkbox'; cb.checked=!!S.usa[c.id]; cb.title='usa nel calcolo';
+    cb.onclick=e=>{e.stopPropagation();S.usa[c.id]=cb.checked;ricalcola();};
+    const n=document.createElement('span'); n.className='nome'; n.textContent=c.nome;
+    const pin=document.createElement('span'); pin.className='pin';
+    pin.textContent = S.segni[c.id] ? (c.t==='cima'?'▲':'✛') : '·';
+    pin.style.color = S.segni[c.id] ? (c.t==='cima'?'#7fbf6a':'#d8b25a') : '#5a4a2a';
+    const res=document.createElement('span'); res.className='res';
+    if(S.res[c.id]!==undefined){
+      const l=S.loo[c.id];
+      res.textContent = S.res[c.id].toFixed(1)+(l!==undefined?'/'+l.toFixed(0):'');
+      res.title='scarto di adattamento / scarto lasciando fuori questo punto (px)';
+      res.style.color = S.res[c.id]>8?'#d4694f':'#7fbf6a';
+    }
+    r.append(cb,n,pin,res);
+    r.onclick=()=>{S.sel=(S.sel===c.id?null:c.id);disegnaElenco();disegna();};
+    r.oncontextmenu=e=>{e.preventDefault(); delete S.segni[c.id]; if(S.sel===c.id)S.sel=null; ricalcola();};
+    el.appendChild(r);
+  }
+}
+
+function mostraEsito(){
+  const t=$('#esito'), g=$('#giudizio');
+  if(!S.sol){
+    const n=Object.keys(S.segni).filter(k=>S.usa[k]).length;
+    t.innerHTML=`<tr><td class="nota">Servono almeno 4 spigoli di base. Ne hai posati ${n}.</td></tr>`;
+    g.innerHTML=''; return;
+  }
+  const pt=puntiAttivi();
+  const rms=Math.sqrt(pt.reduce((s,q)=>s+S.res[q.id]**2,0)/pt.length);
+  const loov=Object.values(S.loo);
+  const looR=loov.length?Math.sqrt(loov.reduce((s,x)=>s+x*x,0)/loov.length):null;
+  const C=centroCamera(S.sol.p);
+  const mPras=mondoB(BER[0]);
+  const mpx=scalaMetri(S.sol.p,mPras);
+  let r=[];
+  r.push(['punti nel calcolo', `${S.sol.nSuolo} suolo + ${S.sol.nAlti} cime`]);
+  r.push(['modello', S.sol.modo==='completo'?'camera completa (con quote)':'solo piano (quote non corrette)']);
+  r.push(['scarto di adattamento', rms.toFixed(1)+' px']);
+  if(looR!==null) r.push(['scarto lasciando fuori uno', looR.toFixed(1)+' px']);
+  if(isFinite(mpx)) r.push(['scala al bersaglio', mpx.toFixed(2)+' m/px']);
+  if(C){
+    const alt=C[2]*S.SW, e=C[0]*S.SW, n=C[1]*S.SW;
+    const dist=Math.hypot(e,n);
+    let az=Math.atan2(e,n)*180/Math.PI; if(az<0)az+=360;
+    r.push(['quota della camera', alt.toFixed(0)+' m sul piano']);
+    r.push(['posizione della camera', dist.toFixed(0)+' m a '+az.toFixed(1)+'° da Cheope']);
+    const ll=LL(e,n);
+    r.push(['&nbsp;', ll.lat.toFixed(5)+' / '+ll.lon.toFixed(5)]);
+  }
+  t.innerHTML=r.map(x=>`<tr><td>${x[0]}</td><td class="v">${x[1]}</td></tr>`).join('');
+
+  let msg='';
+  if(pt.length===4)
+    msg+=`<div class="avviso">Con quattro punti l'adattamento è <b>esatto per costruzione</b>: lo scarto di 0 px non dice niente sulla qualità, perché non c'è nulla in avanzo da smentirlo. Nelle prove su camera finta, quattro spigoli soli hanno sbagliato il bersaglio di decine di metri. Posane almeno sei.</div>`;
+  if(S.sol.modo==='piano')
+    msg+=`<div class="avviso">Nessuna correzione di quota: servono almeno due <b>cime</b> di piramide fra i punti. Senza, un dislivello di 14 m fra Cheope e il dosso si traduce in un errore che cresce con la distanza dal punto sotto la camera.</div>`;
+  if(looR!==null && looR>3*rms)
+    msg+=`<div class="avviso">Lo scarto lasciando fuori un punto è ${(looR/rms).toFixed(1)} volte quello di adattamento: la soluzione si appoggia troppo a pochi punti. Aggiungine altri, meglio se lontani fra loro.</div>`;
+  if(rms<3 && looR!==null && looR<6)
+    msg+=`<div class="avviso buono">Adattamento buono. Il bersaglio resta però <b>fuori</b> dal recinto dei punti di appoggio: guarda l'ellisse di incertezza prima di credere alla crocetta.</div>`;
+  // punti tenuti fuori = prova indipendente
+  const fuori=CAT.filter(c=>S.segni[c.id]&&!S.usa[c.id]);
+  if(fuori.length){
+    let f='<div class="tacca" style="margin-top:8px">Prova indipendente</div><table class="esito">';
+    for(const c of fuori){
+      const [a,b]=proiettaPx(S.sol.p,mondo(c)), s=S.segni[c.id];
+      const dpx=Math.hypot(a-s.u,b-s.v), mp=scalaMetri(S.sol.p,mondo(c));
+      f+=`<tr><td>${c.nome}</td><td class="v">${dpx.toFixed(1)} px · ${(dpx*mp).toFixed(0)} m</td></tr>`;
+    }
+    g.innerHTML=msg+f+'</table>';
+  } else g.innerHTML=msg;
+}
+
+function mostraBersagli(){
+  const el=$('#bersagli');
+  if(!S.sol){el.innerHTML='<div class="nota">Nessuna soluzione.</div>';return;}
+  let h='<table class="esito">';
+  for(const b of BER){
+    const m=mondoB(b);
+    const [a,c]=proiettaPx(S.sol.p,m);
+    const dentro = a>=0&&c>=0&&a<=S.img.width&&c<=S.img.height;
+    h+=`<tr><td>${b.nome}</td><td class="v" style="color:${dentro?'#f2d38a':'#8a723a'}">
+      ${a.toFixed(0)}, ${c.toFixed(0)} px${dentro?'':' · fuori'}</td></tr>`;
+  }
+  h+='</table><div class="nota">Coordinate in pixel dell\'immagine originale. "Fuori" vuol dire che quel punto non è nell\'inquadratura.</div>';
+  el.innerHTML=h;
+}
+
+function mostraMC(){
+  const el=$('#esitoMC');
+  if(!S.mc){el.innerHTML='';return;}
+  let h=`<table class="esito"><tr><td colspan="2" class="nota">Ellisse al 95% su ${S.mc.n} estrazioni.</td></tr>`;
+  for(const b of BER){
+    const e=S.mc.ell[b.id]; if(!e) continue;
+    const mp=scalaMetri(S.sol.p,mondoB(b));
+    h+=`<tr><td>${b.nome}</td><td class="v">±${(e.a*mp).toFixed(0)} × ${(e.b*mp).toFixed(0)} m</td></tr>`;
+  }
+  h+=`</table><div class="nota">È l'incertezza dovuta <b>solo</b> alla mano che clicca. Vanno sommati a parte, e non li vede nessuno scarto:
+  <br>· errore delle coordinate di partenza: <b>2–5 m</b>
+  <br>· quota della base di Chefren sbagliata di 5 m: <b>~9 m</b> sul bersaglio (questo però si vede: lo scarto di adattamento sale)
+  <br>· quota del <b>dosso</b> sbagliata di 5 m: <b>~9 m</b> sul bersaglio, e lo scarto resta a zero. È l'errore invisibile: se nel 1904 il terreno lì era più basso di oggi, la crocetta è fuori posto e nessun numero te lo dice.</div>`;
+  el.innerHTML=h;
+}
+
+/* ---------- 10. INTERAZIONE ---------- */
+function caricaImmagine(file){
+  const url=URL.createObjectURL(file);
+  const im=new Image();
+  im.onload=()=>{
+    S.img=im; S.nomeFile=file.name||'immagine';
+    S.SU=Math.max(im.width,im.height); S.cx=im.width/2; S.cy=im.height/2;
+    const r=$('#tela').getBoundingClientRect();
+    S.vista.s=Math.min(r.width/im.width,r.height/im.height)*0.94;
+    S.vista.tx=(r.width-im.width*S.vista.s)/2;
+    S.vista.ty=(r.height-im.height*S.vista.s)/2;
+    $('#vuoto').style.display='none';
+    $('#stato').textContent=`${S.nomeFile} — ${im.width}×${im.height} px`;
+    ricalcola();
+  };
+  im.src=url;
+}
+
+$('#btnApri').onclick=()=>$('#filePic').click();
+$('#filePic').onchange=e=>{if(e.target.files[0])caricaImmagine(e.target.files[0]);};
+$('#btnCarica').onclick=()=>$('#fileJson').click();
+$('#fileJson').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{
+    const d=JSON.parse(rd.result);
+    S.segni=d.segni||{}; if(d.usa) S.usa=Object.assign(S.usa,d.usa);
+    if(d.quote){Object.assign(Q,d.quote);
+      for(const k in Q){const el=document.getElementById('q_'+k); if(el) el.value=Q[k];}}
+    ricalcola();
+  }catch(err){alert('Scheda illeggibile: '+err.message);}};
+  rd.readAsText(f);
+};
+$('#btnScheda').onclick=()=>{
+  const d={strumento:'Il Reticolo', data:new Date().toISOString(), immagine:S.nomeFile,
+    quote:Object.assign({},Q), segni:S.segni, usa:S.usa,
+    soluzione:S.sol?{modo:S.sol.modo,p:S.sol.p}:null,
+    bersagli:S.sol?Object.fromEntries(BER.map(b=>[b.id,proiettaPx(S.sol.p,mondoB(b))])):null};
+  const bl=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(bl); a.download='reticolo_'+(S.nomeFile||'scheda')+'.json'; a.click();
+};
+$('#btnPulisci').onclick=()=>{if(confirm('Togliere tutti i punti posati?')){S.segni={};S.sel=null;ricalcola();}};
+$('#btnMC').onclick=monteCarlo;
+for(const k of ['cheope','chefren','micerino','sfinge','dosso','hCheope']){
+  const el=document.getElementById('q_'+k);
+  if(el) el.onchange=()=>{Q[k]=parseFloat(el.value)||Q[k];ricalcola();};
+}
+['cbBasi','cbLinea','cbLente','cbInverso'].forEach(i=>$('#'+i).onchange=disegna);
+$('#lenteF').oninput=disegna;
+
+$('#btnRilievo').onclick=scattaRilievo;
+
+// tela
+cv.addEventListener('wheel',e=>{
+  e.preventDefault(); if(!S.img) return;
+  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  const [iu,iv]=C2S(x,y);
+  const k=Math.exp(-e.deltaY*0.0016);
+  S.vista.s=Math.max(0.03,Math.min(60,S.vista.s*k));
+  S.vista.tx=x-iu*S.vista.s; S.vista.ty=y-iv*S.vista.s;
+  disegna();
+},{passive:false});
+
+cv.addEventListener('mousedown',e=>{
+  if(!S.img) return;
+  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  if(e.button===1||e.button===2||e.shiftKey){S.pan={x,y,tx:S.vista.tx,ty:S.vista.ty};return;}
+  // prendi un segno vicino
+  for(const c of CAT){
+    const s=S.segni[c.id]; if(!s) continue;
+    const [a,b]=S2C(s.u,s.v);
+    if(Math.hypot(a-x,b-y)<10){S.trascina=c.id;S.sel=c.id;disegnaElenco();disegna();return;}
+  }
+  if($('#cbInverso').checked && S.sol){
+    const [iu,iv]=C2S(x,y);
+    leggiCoordinate(iu,iv); return;
+  }
+  if(S.sel){
+    const [iu,iv]=C2S(x,y);
+    S.segni[S.sel]={u:iu,v:iv};
+    ricalcola();
+  } else S.pan={x,y,tx:S.vista.tx,ty:S.vista.ty};
+});
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('mousemove',e=>{
+  const r=cv.getBoundingClientRect();
+  S.mouse={x:e.clientX-r.left,y:e.clientY-r.top};
+  if(S.pan){S.vista.tx=S.pan.tx+(S.mouse.x-S.pan.x);S.vista.ty=S.pan.ty+(S.mouse.y-S.pan.y);disegna();return;}
+  if(S.trascina){
+    const [iu,iv]=C2S(S.mouse.x,S.mouse.y);
+    S.segni[S.trascina]={u:iu,v:iv}; disegna(); return;
+  }
+  if($('#cbLente').checked && S.img &&
+     S.mouse.x>=0&&S.mouse.y>=0&&S.mouse.x<=cv.clientWidth&&S.mouse.y<=cv.clientHeight) chiediDisegno();
+});
+window.addEventListener('mouseup',()=>{
+  if(S.trascina){S.trascina=null;ricalcola();}
+  S.pan=null;
+});
+window.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  const k=e.key.toLowerCase();
+  if(k==='p'){scattaRilievo();e.preventDefault();return;}
+  if(k==='+'||k==='='||k==='-'||k==='_'){
+    const f=(k==='-'||k==='_')?1/1.3:1.3;
+    const cx=cv.clientWidth/2, cy=cv.clientHeight/2, [iu,iv]=C2S(cx,cy);
+    S.vista.s=Math.max(0.03,Math.min(60,S.vista.s*f));
+    S.vista.tx=cx-iu*S.vista.s; S.vista.ty=cy-iv*S.vista.s;
+    disegna(); e.preventDefault(); return;
+  }
+  if(!S.sel||!S.segni[S.sel]) return;
+  const d=e.shiftKey?0.2:1;
+  const s=S.segni[S.sel];
+  if(e.key==='ArrowLeft'){s.u-=d/S.vista.s;} else if(e.key==='ArrowRight'){s.u+=d/S.vista.s;}
+  else if(e.key==='ArrowUp'){s.v-=d/S.vista.s;} else if(e.key==='ArrowDown'){s.v+=d/S.vista.s;}
+  else return;
+  e.preventDefault(); ricalcola();
+});
+
+// trascinamento file e incolla
+['dragover','drop'].forEach(t=>document.addEventListener(t,e=>e.preventDefault()));
+document.addEventListener('drop',e=>{
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('image/')) caricaImmagine(f);
+  else if(f&&f.name.endsWith('.json')){const rd=new FileReader();
+    rd.onload=()=>{try{const d=JSON.parse(rd.result);S.segni=d.segni||{};ricalcola();}catch(x){}};
+    rd.readAsText(f);}
+});
+document.addEventListener('paste',e=>{
+  for(const it of e.clipboardData.items)
+    if(it.type.startsWith('image/')){caricaImmagine(it.getAsFile());break;}
+});
+
+function leggiCoordinate(iu,iv){
+  // inversione sul piano del suolo (Z = quota indicata)
+  const p=S.sol.p, [un,vn]=toNorm(iu,iv);
+  const Zq=(Q.dosso-Q.cheope)/S.SW; // il piano letto \u00e8 quello del dosso
+  // risolve  (h1 X + h2 Y + h3 + w1 Z) - u (h7 X + h8 Y + 1 + w3 Z) = 0  e analoga
+  const A=[p[0]-un*p[6], p[1]-un*p[7], p[3]-vn*p[6], p[4]-vn*p[7]];
+  const b=[un*(1+p[10]*Zq)-p[2]-p[8]*Zq, vn*(1+p[10]*Zq)-p[5]-p[9]*Zq];
+  const det=A[0]*A[3]-A[1]*A[2];
+  if(Math.abs(det)<1e-12){alert('Inversione impossibile in questo punto.');return;}
+  const X=( b[0]*A[3]-A[1]*b[1])/det, Y=(A[0]*b[1]-b[0]*A[2])/det;
+  const E=X*S.SW, N=Y*S.SW, ll=LL(E,N);
+  const dC=Math.hypot(E,N); let az=Math.atan2(E,N)*180/Math.PI; if(az<0)az+=360;
+  alert(`Punto letto sul piano a quota ${Q.dosso} m s.l.m.\n\n`+
+    `${ll.lat.toFixed(6)} / ${ll.lon.toFixed(6)}\n`+
+    `${gms(ll.lat,'N','S')}  ${gms(ll.lon,'E','O')}\n\n`+
+    `da centro Cheope: ${dC.toFixed(1)} m ad azimut ${az.toFixed(2)}°\n`+
+    `dal punto di Piras: ${Math.hypot(E-EN(BER[0].lat,BER[0].lon).E,N-EN(BER[0].lat,BER[0].lon).N).toFixed(1)} m`);
+}
+
+/* ---------- 11. RILIEVO ---------- */
+function scattaRilievo(){
+  if(!S.img) return;
+  const H=170, w=cv.clientWidth, h=cv.clientHeight;
+  const o=document.createElement('canvas');
+  o.width=w; o.height=h+H;
+  const c=o.getContext('2d');
+  c.fillStyle='#0c0a07'; c.fillRect(0,0,w,h+H);
+  c.drawImage(cv,0,0,w,h);
+  c.strokeStyle='#3a2f1a'; c.beginPath(); c.moveTo(0,h+.5); c.lineTo(w,h+.5); c.stroke();
+  c.fillStyle='#d8b25a'; c.font='600 13px monospace';
+  c.fillText('IL RETICOLO — rilievo georeferenziato · suite Precessio',14,h+24);
+  c.font='11px monospace'; c.fillStyle='#c9bda4';
+  const L=[];
+  L.push('immagine: '+S.nomeFile+'   ·   '+new Date().toLocaleString('it-IT'));
+  if(S.sol){
+    const pt=puntiAttivi();
+    const rms=Math.sqrt(pt.reduce((s,q)=>s+S.res[q.id]**2,0)/pt.length);
+    const loov=Object.values(S.loo);
+    const looR=loov.length?Math.sqrt(loov.reduce((s,x)=>s+x*x,0)/loov.length):null;
+    L.push(`punti: ${S.sol.nSuolo} di suolo + ${S.sol.nAlti} cime   ·   modello: ${S.sol.modo}`);
+    L.push(`scarto di adattamento ${rms.toFixed(1)} px`+(looR!==null?`   ·   lasciando fuori uno ${looR.toFixed(1)} px`:''));
+    const C=centroCamera(S.sol.p);
+    if(C){
+      const alt=C[2]*S.SW, e=C[0]*S.SW, n=C[1]*S.SW;
+      let az=Math.atan2(e,n)*180/Math.PI; if(az<0)az+=360;
+      L.push(`camera: quota ${alt.toFixed(0)} m sul piano di base, a ${Math.hypot(e,n).toFixed(0)} m da Cheope, azimut ${az.toFixed(1)}°`);
+    }
+    const m=mondoB(BER[0]), pp=proiettaPx(S.sol.p,m), mp=scalaMetri(S.sol.p,m);
+    L.push(`punto di Piras (29,98003 / 31,12626) → pixel ${pp[0].toFixed(0)}, ${pp[1].toFixed(0)}   ·   scala ${mp.toFixed(2)} m/px`);
+    if(S.mc&&S.mc.ell['piras']){
+      const e=S.mc.ell['piras'];
+      L.push(`incertezza da clic (95%, ${S.mc.n} estrazioni): ±${(e.a*mp).toFixed(0)} × ${(e.b*mp).toFixed(0)} m`);
+    }
+    const fuori=CAT.filter(x=>S.segni[x.id]&&!S.usa[x.id]);
+    for(const x of fuori){
+      const [a,b]=proiettaPx(S.sol.p,mondo(x)), s=S.segni[x.id];
+      const d=Math.hypot(a-s.u,b-s.v);
+      L.push(`prova indipendente — ${x.nome}: previsto a ${(d*scalaMetri(S.sol.p,mondo(x))).toFixed(0)} m dall'osservato`);
+    }
+  } else L.push('nessuna soluzione: servono almeno 4 spigoli di base.');
+  L.push('coordinate dei monumenti misurate su Google Earth Pro; quote delle basi: stime dichiarate, non misurate.');
+  L.forEach((s,i)=>c.fillText(s,14,h+46+i*16));
+  const a=document.createElement('a');
+  a.href=o.toDataURL('image/png');
+  a.download='reticolo_'+(S.nomeFile.replace(/\.[^.]+$/,'')||'rilievo')+'.png';
+  a.click();
+}
+
+/* ---------- avvio ---------- */
+window.addEventListener('resize',ridimensiona);
+disegnaElenco(); ridimensiona();
+
+</script>
+</body>
+</html>
