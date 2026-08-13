@@ -1,0 +1,3297 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Il Reticolo — georeferenziazione di foto storiche · Precessio</title>
+<style>
+:root{
+  --fondo:#0c0a07;
+  --fondo2:#141009;
+  --pannello:#1a150d;
+  --oro:#d8b25a;
+  --oro-tenue:#8a723a;
+  --oro-vivo:#f2d38a;
+  --sabbia:#c9bda4;
+  --verde:#7fbf6a;
+  --rosso:#d4694f;
+  --azzurro:#6aa9d4;
+  --bordo:#3a2f1a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--fondo);color:var(--sabbia);
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;overflow:hidden}
+.dato{font-family:"SF Mono",Menlo,Consolas,"DejaVu Sans Mono",monospace;font-variant-numeric:tabular-nums}
+
+#app{display:grid;grid-template-columns:290px 1fr 300px;grid-template-rows:auto 1fr;height:100%}
+header{grid-column:1/4;display:flex;align-items:baseline;gap:14px;padding:8px 14px;
+  background:linear-gradient(180deg,#191308,#0e0b07);border-bottom:1px solid var(--bordo)}
+header h1{margin:0;font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--oro);font-weight:600}
+header .sub{font-size:12px;color:var(--oro-tenue);letter-spacing:.04em}
+header .stato{margin-left:auto;font-size:11px;color:var(--sabbia);opacity:.75}
+
+aside{background:var(--pannello);border-right:1px solid var(--bordo);overflow-y:auto;padding:10px}
+aside.destra{border-right:none;border-left:1px solid var(--bordo)}
+h2{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--oro-tenue);
+  margin:14px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--bordo)}
+h2:first-child{margin-top:2px}
+
+#tela{position:relative;background:#000;overflow:hidden}
+canvas{display:block;position:absolute;inset:0}
+#vuoto{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;color:var(--oro-tenue);text-align:center;padding:40px;pointer-events:none}
+#vuoto b{color:var(--oro);font-size:15px;letter-spacing:.08em}
+#vuoto span{font-size:12.5px;max-width:420px;line-height:1.55}
+
+.riga{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 4px;border-radius:3px;cursor:pointer}
+.riga:hover{background:#241d10}
+.riga.sel{background:#2e2411;outline:1px solid var(--oro-tenue)}
+.riga .nome{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.riga .pin{width:15px;text-align:center;font-size:11px}
+.riga.posato .nome{color:var(--oro-vivo)}
+.riga .res{font-size:10px;opacity:.75;font-family:monospace}
+.gruppo{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--oro-tenue);margin:8px 0 2px}
+
+button{font-family:inherit;font-size:12px;color:var(--sabbia);background:#241c10;
+  border:1px solid var(--bordo);border-radius:3px;padding:5px 9px;cursor:pointer}
+button:hover{border-color:var(--oro-tenue);color:var(--oro-vivo)}
+button.primario{background:#3a2c12;border-color:var(--oro-tenue);color:var(--oro)}
+button:disabled{opacity:.35;cursor:default}
+.bottoniera{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+
+label.campo{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;margin:5px 0}
+label.campo input[type=number],label.campo select{width:88px;background:#0e0b07;color:var(--oro-vivo);
+  border:1px solid var(--bordo);border-radius:3px;padding:3px 5px;font-family:monospace;font-size:11.5px}
+label.spunta{display:flex;align-items:center;gap:7px;font-size:11.5px;margin:4px 0;cursor:pointer}
+
+table.esito{width:100%;border-collapse:collapse;font-size:11.5px}
+table.esito td{padding:2px 0;vertical-align:top}
+table.esito td.v{text-align:right;font-family:monospace;color:var(--oro-vivo)}
+.nota{font-size:11px;line-height:1.5;color:#a2977f;margin:6px 0}
+.avviso{font-size:11px;line-height:1.5;border-left:2px solid var(--rosso);padding:5px 8px;margin:8px 0;
+  background:#20130e;color:#e0b9ac}
+.buono{border-left-color:var(--verde);background:#131c10;color:#c2ddb6}
+.tacca{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--oro-tenue)}
+input[type=file]{display:none}
+label.campo input[type=text]{width:150px;background:#0e0b07;color:var(--oro-vivo);
+  border:1px solid var(--bordo);border-radius:3px;padding:3px 5px;font-family:monospace;font-size:11px}
+::-webkit-scrollbar{width:9px}::-webkit-scrollbar-track{background:#0e0b07}
+::-webkit-scrollbar-thumb{background:#3a2f1a;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Il Reticolo</h1>
+    <span class="sub">georeferenziazione di foto storiche · suite Precessio</span>
+    <span class="sub" style="color:var(--verde);border:1px solid var(--bordo);border-radius:3px;padding:1px 7px">v23 · restauro e ritaglio</span>
+    <span class="stato" id="stato">nessuna immagine caricata</span>
+  </header>
+
+  <aside class="sinistra">
+    <h2>Immagine</h2>
+    <div class="bottoniera">
+      <button class="primario" id="btnApri">Apri foto o scheda…</button>
+      <button id="btnScheda">Scheda JSON</button>
+    </div>
+    <input type="file" id="filePic" multiple>
+    <input type="file" id="fileJson" multiple>
+    <div class="nota">Un solo pulsante per <b>foto e schede</b>: capisce da sé cosa gli dai, e puoi sceglierle insieme. Si può anche trascinare sulla tela, o incollare con Ctrl+V. Legge anche i <b>TIFF</b> d'archivio, senza convertirli. L'immagine resta sul tuo computer: niente viene caricato da nessuna parte.</div>
+
+    <h2>Scheda della fotografia</h2>
+    <div class="nota">Si compila da sé se riconosce il nome del file. <b>Controlla sempre sulla pagina d'archivio prima di pubblicare</b>: questi campi finiscono nel rilievo e nella didascalia del libro.</div>
+    <label class="campo">Archivio<input type="text" id="fArchivio" placeholder="—"></label>
+    <label class="campo">Segnatura<input type="text" id="fSegnatura" placeholder="—"></label>
+    <label class="campo">Autore<input type="text" id="fAutore" placeholder="—"></label>
+    <label class="campo">Data<input type="text" id="fData" placeholder="—"></label>
+    <label class="campo">Quota dichiarata (m)<input type="number" id="fQuota" placeholder="—" step="10"></label>
+    <label class="campo">Diritti<input type="text" id="fLicenza" placeholder="—"></label>
+    <label class="campo">Pagina<input type="text" id="fUrl" placeholder="—"></label>
+    <div class="nota" id="fNota"></div>
+
+    <h2>Punti di appoggio</h2>
+    <div class="nota">Clicca sulla foto dove vedi uno spigolo: lo strumento riconosce da solo quale &egrave;. Trascina per correggere, frecce per lo scarto fine.
+    <br><br><b>La spunta non cancella</b>, esclude dal calcolo: serve per tenere un punto fuori e usarlo come prova. Per cancellare davvero, il <b>&times;</b> a fine riga.</div>
+    <div id="elenco"></div>
+
+    <h2>Quote (m s.l.m.)</h2>
+    <div class="nota"><b>Spigoli ricostruiti (v17):</b> centro dalla misura di Ade, lato e orientamento dai rilievi pubblicati (Cole 1925 / Dorner / Lehner per il lato di Cheope; Nell &amp; Ruggles 2012 per gli orientamenti). Prima gli spigoli misurati da satellite erano corti del 2% e ruotati di mezzo grado.</div>
+    <div class="nota">Contano solo le <b>differenze</b>: Chefren siede ~10 m più in alto di Cheope, e il dosso ~13. Sono stime dichiarate — sostituiscile appena le misuri.</div>
+    <label class="campo">Base di Cheope <span class="tacca">stima</span><input type="number" id="q_cheope" value="60" step="0.5"></label>
+    <label class="campo">Base di Chefren <span class="tacca">stima</span><input type="number" id="q_chefren" value="70" step="0.5"></label>
+    <label class="campo">Base di Micerino <span class="tacca">stima</span><input type="number" id="q_micerino" value="66" step="0.5"></label>
+    <label class="campo">Piano della Sfinge <span class="tacca">stima</span><input type="number" id="q_sfinge" value="22" step="0.5"></label>
+    <label class="campo">Dosso <span class="tacca">misurato</span><input type="number" id="q_dosso" value="73" step="0.5"></label>
+    <label class="campo">Cima di Cheope<input type="number" id="q_hCheope" value="138.8" step="0.1"></label>
+    <div class="nota">138,8 m è la cima spogliata: è quella che si vede in tutte le foto storiche. Metti 146,6 solo se stai lavorando su una ricostruzione.</div>
+
+    <h2>Dove prendere le foto</h2>
+    <div class="nota">Su Wikimedia Commons, categoria <i>Aerial photographs of Giza pyramid complex</i>:
+    <br>· <b>Spelterini, 21 novembre 1904</b>, pallone a ~600 m — l'unica ripresa aerea anteriore agli scavi di Junker (1912) e Reisner (1905). Segnatura CH-NB · EAD-WEHR-32044-B.
+    <br>· <b>ETH-BIB, volo del Kilimangiaro 1929-30</b> (Mittelholzer): sette riprese a 4961 px, una dichiarata "aus 400 m Höhe" (LBS MH02-07-0154). Posteriori a Junker, ma nitidissime: usale per imparare a posare i punti.
+    <br>· <b>LOC matpc</b> 12378 e 23055, quasi a piombo, 5000 px.
+    <br>I file grossi sono TIFF: sulla pagina di Commons usa "Scarica" e scegli JPEG, altrimenti il browser non li apre.</div>
+  </aside>
+
+  <div id="tela">
+    <canvas id="cv"></canvas>
+    <div id="vuoto">
+      <b>Apri una foto aerea di Giza</b>
+      <span>Poi indica sulla foto almeno quattro spigoli di base e due cime di piramide. Il Reticolo calcola la camera che ha scattato quella foto e ti dice <i>dove deve cadere</i> il punto della seconda sfinge — prima che tu lo guardi.</span>
+    </div>
+  </div>
+
+  <div id="provino" style="display:none;position:absolute;inset:0;background:rgba(8,6,4,.96);z-index:50;
+       overflow:auto;padding:18px">
+    <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:10px">
+      <b style="color:var(--oro);letter-spacing:.12em;text-transform:uppercase;font-size:13px">Provino cieco</b>
+      <span id="provinoTesto" style="font-size:12px;color:var(--sabbia)"></span>
+      <button id="provinoChiudi" style="margin-left:auto">Chiudi</button>
+    </div>
+    <div id="provinoGriglia" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:720px"></div>
+    <div class="bottoniera" style="max-width:720px"><button id="provinoRivela">Rivela</button></div>
+    <div id="provinoEsito" class="nota" style="max-width:720px"></div>
+  </div>
+
+  <aside class="destra">
+    <h2>Soluzione</h2>
+    <table class="esito" id="esito"><tr><td class="nota">In attesa di punti.</td></tr></table>
+    <div id="giudizio"></div>
+
+    <h2>Bersagli</h2>
+    <div id="bersagli"></div>
+
+    <h2>Restauro foto</h2>
+    <div class="nota">Non inventa dettaglio: solo rimappatura dei livelli, dichiarata e reversibile. Nessuna nitidezza automatica, nessuna ricostruzione — quelle inventano contorni che non ci sono.</div>
+    <label class="spunta"><input type="checkbox" id="cbOscura"> Anteprima dal vivo</label>
+    <label class="campo">Punto di nero<input type="number" id="ozNero" value="0" min="0" max="254" step="5"></label>
+    <label class="campo">Punto di bianco<input type="number" id="ozBianco" value="255" min="1" max="255" step="5"></label>
+    <label class="campo">Gamma<input type="number" id="ozGamma" value="1" min="0.2" max="3" step="0.1"></label>
+    <div class="bottoniera">
+      <button id="btnAuto">Finestra sui pixel visibili</button>
+      <button id="btnReset">Anteprima a zero</button>
+    </div>
+    <div class="nota" id="ozInfo"></div>
+    <div class="bottoniera"><button class="primario" id="btnRestaura">RESTAURO FOTO</button></div>
+    <div class="nota">Cuoce i livelli in una copia a piena risoluzione e ci lavori sopra da qui in poi. <b>L'originale scaricato resta intatto</b>, non lo tocca mai: puoi tornarci quando vuoi.</div>
+    <div class="bottoniera"><button id="btnOriginale" disabled>Mostra l'originale</button></div>
+
+    <h2>Ritaglio da pulire</h2>
+    <div class="nota">Disegna un rettangolo sulla foto per isolare il pezzo che ti interessa &mdash; il dosso, uno spigolo &mdash; e scaricarlo a piena risoluzione, con la provenienza stampata sotto.</div>
+    <div class="bottoniera">
+      <button id="btnRitaglio">Disegna il rettaglio</button>
+      <button id="btnRitaglioScarica" disabled>Scarica il ritaglio</button>
+    </div>
+    <div class="nota" id="ritInfo"></div>
+
+    <div class="bottoniera"><button id="btnProvino">Provino cieco</button></div>
+    <div class="nota">Ritaglia il bersaglio e otto zone di controllo prese a caso alla stessa distanza, le tratta <b>allo stesso modo</b> e le mescola. Se non riconosci quale sia il bersaglio, quello che vedevi era grana.</div>
+
+    <h2>Incertezza</h2>
+    <label class="campo">Errore di clic (px)<input type="number" id="sigma" value="3" step="0.5" min="0.5"></label>
+    <label class="campo">Estrazioni<input type="number" id="mcN" value="300" step="50" min="50"></label>
+    <div class="bottoniera"><button id="btnMC">Misura l'incertezza</button></div>
+    <div id="esitoMC"></div>
+
+    <h2>Disegno</h2>    <h2>Disegno</h2>
+    <label class="spunta"><input type="checkbox" id="cbBasi" checked> Basi ricostruite delle piramidi</label>
+    <label class="spunta"><input type="checkbox" id="cbLinea" checked> Prolungamento del lato nord</label>
+    <label class="spunta"><input type="checkbox" id="cbBussola" checked> Bussola (nord calcolato)</label>
+    <label class="spunta"><input type="checkbox" id="cbLente" checked> Lente d'ingrandimento</label>
+    <label class="campo">Ingrandimento della lente<input type="number" id="lenteF" value="4" step="1" min="1" max="20"></label>
+    <div class="nota">È <b>relativo a quello che vedi</b>: 4 vuol dire quattro volte più grande della tela. Se sei rimpicciolito su tutta la foto, la lente resta rimpicciolita anche lei — <b>prima zooma con la rotellina sulla piramide</b>, poi usa la lente per l'ultimo pixel.</div>
+    <label class="spunta"><input type="checkbox" id="cbInverso"> Modo inverso: leggi le coordinate</label>
+    <div class="nota">Il modo inverso va usato <b>dopo</b> aver guardato il punto calcolato, non prima: cercare l'anomalia e poi localizzarla è esattamente il passaggio che contestiamo altrove.</div>
+    <div class="bottoniera">
+      <button class="primario" id="btnRilievo">P — scatta rilievo</button>
+      <button id="btnCarica">Apri foto o scheda…</button>
+      <button id="btnPulisci">Togli tutti i punti</button>
+    </div>
+  </aside>
+</div>
+<script>
+/* pako (solo inflate) — MIT License, Copyright (c) 2014-2017 Vitaly Puzrin e Andrei Tuputcyn.
+   Serve a UTIF per i TIFF compressi in deflate. */
+(function(e,t){typeof exports==`object`&&typeof module<`u`?t(exports):typeof define==`function`&&define.amd?define([`exports`],t):(e=typeof globalThis<`u`?globalThis:e||self,t(e.pako={}))})(this,function(e){Object.defineProperty(e,Symbol.toStringTag,{value:`Module`});var t=4,n=0,r=1,i=2;function a(e){let t=e.length;for(;--t>=0;)e[t]=0}var o=0,s=1,c=2,l=29,u=256,d=286,f=30,p=19,m=573,h=15,g=16,_=256,v=16,y=17,b=18,x=new Uint8Array([0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0]),S=new Uint8Array([0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13]);new Uint8Array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7]);var C=new Uint8Array([16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]),w=512,T=Array(288*2);a(T);var E=Array(f*2);a(E);var D=Array(w);a(D);var O=Array(256);a(O);var k=Array(l);a(k);var A=Array(f);a(A);var j=e=>e<256?D[e]:D[256+(e>>>7)],M=(e,t)=>{e.pending_buf[e.pending++]=t&255,e.pending_buf[e.pending++]=t>>>8&255},N=(e,t,n)=>{e.bi_valid>g-n?(e.bi_buf|=t<<e.bi_valid&65535,M(e,e.bi_buf),e.bi_buf=t>>g-e.bi_valid,e.bi_valid+=n-g):(e.bi_buf|=t<<e.bi_valid&65535,e.bi_valid+=n)},P=(e,t,n)=>{N(e,n[t*2],n[t*2+1])},ee=(e,t)=>{let n=0;do n|=e&1,e>>>=1,n<<=1;while(--t>0);return n>>>1},te=(e,t)=>{let n=t.dyn_tree,r=t.max_code,i=t.stat_desc.static_tree,a=t.stat_desc.has_stree,o=t.stat_desc.extra_bits,s=t.stat_desc.extra_base,c=t.stat_desc.max_length,l,u,d,f,p,g,_=0;for(f=0;f<=h;f++)e.bl_count[f]=0;for(n[e.heap[e.heap_max]*2+1]=0,l=e.heap_max+1;l<m;l++)u=e.heap[l],f=n[n[u*2+1]*2+1]+1,f>c&&(f=c,_++),n[u*2+1]=f,!(u>r)&&(e.bl_count[f]++,p=0,u>=s&&(p=o[u-s]),g=n[u*2],e.opt_len+=g*(f+p),a&&(e.static_len+=g*(i[u*2+1]+p)));if(_!==0){do{for(f=c-1;e.bl_count[f]===0;)f--;e.bl_count[f]--,e.bl_count[f+1]+=2,e.bl_count[c]--,_-=2}while(_>0);for(f=c;f!==0;f--)for(u=e.bl_count[f];u!==0;)d=e.heap[--l],!(d>r)&&(n[d*2+1]!==f&&(e.opt_len+=(f-n[d*2+1])*n[d*2],n[d*2+1]=f),u--)}},ne=(e,t,n)=>{let r=Array(16),i=0,a,o;for(a=1;a<=h;a++)i=i+n[a-1]<<1,r[a]=i;for(o=0;o<=t;o++){let t=e[o*2+1];t!==0&&(e[o*2]=ee(r[t]++,t))}},re=e=>{let t;for(t=0;t<d;t++)e.dyn_ltree[t*2]=0;for(t=0;t<f;t++)e.dyn_dtree[t*2]=0;for(t=0;t<p;t++)e.bl_tree[t*2]=0;e.dyn_ltree[_*2]=1,e.opt_len=e.static_len=0,e.sym_next=e.matches=0},ie=e=>{e.bi_valid>8?M(e,e.bi_buf):e.bi_valid>0&&(e.pending_buf[e.pending++]=e.bi_buf),e.bi_buf=0,e.bi_valid=0},ae=(e,t,n,r)=>{let i=t*2,a=n*2;return e[i]<e[a]||e[i]===e[a]&&r[t]<=r[n]},oe=(e,t,n)=>{let r=e.heap[n],i=n<<1;for(;i<=e.heap_len&&(i<e.heap_len&&ae(t,e.heap[i+1],e.heap[i],e.depth)&&i++,!ae(t,r,e.heap[i],e.depth));)e.heap[n]=e.heap[i],n=i,i<<=1;e.heap[n]=r},se=(e,t,n)=>{let r,i,a=0,o,s;if(e.sym_next!==0)do r=e.pending_buf[e.sym_buf+a++]&255,r+=(e.pending_buf[e.sym_buf+a++]&255)<<8,i=e.pending_buf[e.sym_buf+a++],r===0?P(e,i,t):(o=O[i],P(e,o+u+1,t),s=x[o],s!==0&&(i-=k[o],N(e,i,s)),r--,o=j(r),P(e,o,n),s=S[o],s!==0&&(r-=A[o],N(e,r,s)));while(a<e.sym_next);P(e,_,t)},ce=(e,t)=>{let n=t.dyn_tree,r=t.stat_desc.static_tree,i=t.stat_desc.has_stree,a=t.stat_desc.elems,o,s,c=-1,l;for(e.heap_len=0,e.heap_max=m,o=0;o<a;o++)n[o*2]===0?n[o*2+1]=0:(e.heap[++e.heap_len]=c=o,e.depth[o]=0);for(;e.heap_len<2;)l=e.heap[++e.heap_len]=c<2?++c:0,n[l*2]=1,e.depth[l]=0,e.opt_len--,i&&(e.static_len-=r[l*2+1]);for(t.max_code=c,o=e.heap_len>>1;o>=1;o--)oe(e,n,o);l=a;do o=e.heap[1],e.heap[1]=e.heap[e.heap_len--],oe(e,n,1),s=e.heap[1],e.heap[--e.heap_max]=o,e.heap[--e.heap_max]=s,n[l*2]=n[o*2]+n[s*2],e.depth[l]=(e.depth[o]>=e.depth[s]?e.depth[o]:e.depth[s])+1,n[o*2+1]=n[s*2+1]=l,e.heap[1]=l++,oe(e,n,1);while(e.heap_len>=2);e.heap[--e.heap_max]=e.heap[1],te(e,t),ne(n,c,e.bl_count)},le=(e,t,n)=>{let r,i=-1,a,o=t[1],s=0,c=7,l=4;for(o===0&&(c=138,l=3),t[(n+1)*2+1]=65535,r=0;r<=n;r++)a=o,o=t[(r+1)*2+1],!(++s<c&&a===o)&&(s<l?e.bl_tree[a*2]+=s:a===0?s<=10?e.bl_tree[y*2]++:e.bl_tree[b*2]++:(a!==i&&e.bl_tree[a*2]++,e.bl_tree[v*2]++),s=0,i=a,o===0?(c=138,l=3):a===o?(c=6,l=3):(c=7,l=4))},ue=(e,t,n)=>{let r,i=-1,a,o=t[1],s=0,c=7,l=4;for(o===0&&(c=138,l=3),r=0;r<=n;r++)if(a=o,o=t[(r+1)*2+1],!(++s<c&&a===o)){if(s<l)do P(e,a,e.bl_tree);while(--s!==0);else a===0?s<=10?(P(e,y,e.bl_tree),N(e,s-3,3)):(P(e,b,e.bl_tree),N(e,s-11,7)):(a!==i&&(P(e,a,e.bl_tree),s--),P(e,v,e.bl_tree),N(e,s-3,2));s=0,i=a,o===0?(c=138,l=3):a===o?(c=6,l=3):(c=7,l=4)}},de=e=>{let t;for(le(e,e.dyn_ltree,e.l_desc.max_code),le(e,e.dyn_dtree,e.d_desc.max_code),ce(e,e.bl_desc),t=p-1;t>=3&&e.bl_tree[C[t]*2+1]===0;t--);return e.opt_len+=3*(t+1)+5+5+4,t},fe=(e,t,n,r)=>{let i;for(N(e,t-257,5),N(e,n-1,5),N(e,r-4,4),i=0;i<r;i++)N(e,e.bl_tree[C[i]*2+1],3);ue(e,e.dyn_ltree,t-1),ue(e,e.dyn_dtree,n-1)},pe=e=>{let t=4093624447,i;for(i=0;i<=31;i++,t>>>=1)if(t&1&&e.dyn_ltree[i*2]!==0)return n;if(e.dyn_ltree[18]!==0||e.dyn_ltree[20]!==0||e.dyn_ltree[26]!==0)return r;for(i=32;i<u;i++)if(e.dyn_ltree[i*2]!==0)return r;return n},me=(e,t,n,r)=>{N(e,(o<<1)+ +!!r,3),ie(e),M(e,n),M(e,~n),n&&e.pending_buf.set(e.window.subarray(t,t+n),e.pending),e.pending+=n},he=(e,n,r,a)=>{let o,l,u=0;e.level>0?(e.strm.data_type===i&&(e.strm.data_type=pe(e)),ce(e,e.l_desc),ce(e,e.d_desc),u=de(e),o=e.opt_len+3+7>>>3,l=e.static_len+3+7>>>3,l<=o&&(o=l)):o=l=r+5,r+4<=o&&n!==-1?me(e,n,r,a):e.strategy===t||l===o?(N(e,(s<<1)+ +!!a,3),se(e,T,E)):(N(e,(c<<1)+ +!!a,3),fe(e,e.l_desc.max_code+1,e.d_desc.max_code+1,u+1),se(e,e.dyn_ltree,e.dyn_dtree)),re(e),a&&ie(e)},F=(e,t,n)=>(e.pending_buf[e.sym_buf+e.sym_next++]=t,e.pending_buf[e.sym_buf+e.sym_next++]=t>>8,e.pending_buf[e.sym_buf+e.sym_next++]=n,t===0?e.dyn_ltree[n*2]++:(e.matches++,t--,e.dyn_ltree[(O[n]+u+1)*2]++,e.dyn_dtree[j(t)*2]++),e.sym_next===e.sym_end),ge=(e,t,n,r)=>{let i=e&65535|0,a=e>>>16&65535|0,o=0;for(;n!==0;){o=n>2e3?2e3:n,n-=o;do i=i+t[r++]|0,a=a+i|0;while(--o);i%=65521,a%=65521}return i|a<<16|0},_e=new Uint32Array((()=>{let e,t=[];for(var n=0;n<256;n++){e=n;for(var r=0;r<8;r++)e=e&1?3988292384^e>>>1:e>>>1;t[n]=e}return t})()),I=(e,t,n,r)=>{let i=_e,a=r+n;e^=-1;for(let n=r;n<a;n++)e=e>>>8^i[(e^t[n])&255];return e^-1},ve={2:`need dictionary`,1:`stream end`,0:``,"-1":`file error`,"-2":`stream error`,"-3":`data error`,"-4":`insufficient memory`,"-5":`buffer error`,"-6":`incompatible version`},L=3,ye=258,R=262,z=1,be=2,xe=3,Se=4,Ce=e=>{let t,n,r,i=e.w_size;t=e.hash_size,r=t;do n=e.head[--r],e.head[r]=n>=i?n-i:0;while(--t);t=i,r=t;do n=e.prev[--r],e.prev[r]=n>=i?n-i:0;while(--t)},we=(e,t,n)=>(t<<e.hash_shift^n)&e.hash_mask,B=(e,t)=>{let n;if(e.legacy_hash)n=e.ins_h=we(e,e.ins_h,e.window[t+L-1]);else{let r=e.window,i=r[t]|r[t+1]<<8|r[t+2]<<16|r[t+3]<<24;n=e.ins_h=Math.imul(i,66521)+66521>>>16&e.hash_mask}let r=e.prev[t&e.w_mask]=e.head[n];return e.head[n]=t,r},Te=e=>{let t=e.state,n=t.pending;n>e.avail_out&&(n=e.avail_out),n!==0&&(e.output.set(t.pending_buf.subarray(t.pending_out,t.pending_out+n),e.next_out),e.next_out+=n,t.pending_out+=n,e.total_out+=n,e.avail_out-=n,t.pending-=n,t.pending===0&&(t.pending_out=0))},V=(e,t)=>{he(e,e.block_start>=0?e.block_start:-1,e.strstart-e.block_start,t),e.block_start=e.strstart,Te(e.strm)},Ee=(e,t,n,r)=>{let i=e.avail_in;return i>r&&(i=r),i===0?0:(e.avail_in-=i,t.set(e.input.subarray(e.next_in,e.next_in+i),n),e.state.wrap===1?e.adler=ge(e.adler,t,i,n):e.state.wrap===2&&(e.adler=I(e.adler,t,i,n)),e.next_in+=i,e.total_in+=i,i)},De=(e,t)=>{let n=e.max_chain_length,r=e.strstart,i,a,o=e.prev_length,s=e.nice_match,c=e.strstart>e.w_size-R?e.strstart-(e.w_size-R):0,l=e.window,u=e.w_mask,d=e.prev,f=e.strstart+ye,p=l[r+o-1],m=l[r+o];e.prev_length>=e.good_match&&(n>>=2),s>e.lookahead&&(s=e.lookahead);do{if(i=t,l[i+o]!==m||l[i+o-1]!==p||l[i]!==l[r]||l[++i]!==l[r+1])continue;r+=2,i++;do;while(l[++r]===l[++i]&&l[++r]===l[++i]&&l[++r]===l[++i]&&l[++r]===l[++i]&&l[++r]===l[++i]&&l[++r]===l[++i]&&l[++r]===l[++i]&&l[++r]===l[++i]&&r<f);if(a=ye-(f-r),r=f-ye,a>o){if(e.match_start=t,o=a,a>=s)break;p=l[r+o-1],m=l[r+o]}}while((t=d[t&u])>c&&--n!==0);return o<=e.lookahead?o:e.lookahead},Oe=e=>{let t=e.w_size,n,r,i;do{if(r=e.window_size-e.lookahead-e.strstart,e.strstart>=t+(t-R)&&(e.window.set(e.window.subarray(t,t+t-r),0),e.match_start-=t,e.strstart-=t,e.block_start-=t,e.insert>e.strstart&&(e.insert=e.strstart),Ce(e),r+=t),e.strm.avail_in===0)break;if(n=Ee(e.strm,e.window,e.strstart+e.lookahead,r),e.lookahead+=n,!e.legacy_hash){if(e.lookahead+e.insert>L)for(i=e.strstart-e.insert;e.insert&&(B(e,i),i++,e.insert--,!(e.lookahead+e.insert<=L)););}else if(e.lookahead+e.insert>=L)for(i=e.strstart-e.insert,e.ins_h=e.window[i],e.ins_h=we(e,e.ins_h,e.window[i+1]);e.insert&&(B(e,i),i++,e.insert--,!(e.lookahead+e.insert<L)););}while(e.lookahead<R&&e.strm.avail_in!==0)},ke=(e,t)=>{let n=e.pending_buf_size-5>e.w_size?e.w_size:e.pending_buf_size-5,r,i,a,o=0,s=e.strm.avail_in;do{if(r=65535,a=e.bi_valid+42>>3,e.strm.avail_out<a||(a=e.strm.avail_out-a,i=e.strstart-e.block_start,r>i+e.strm.avail_in&&(r=i+e.strm.avail_in),r>a&&(r=a),r<n&&(r===0&&t!==4||t===0||r!==i+e.strm.avail_in)))break;o=+(t===4&&r===i+e.strm.avail_in),me(e,0,0,o),e.pending_buf[e.pending-4]=r,e.pending_buf[e.pending-3]=r>>8,e.pending_buf[e.pending-2]=~r,e.pending_buf[e.pending-1]=~r>>8,Te(e.strm),i&&(i>r&&(i=r),e.strm.output.set(e.window.subarray(e.block_start,e.block_start+i),e.strm.next_out),e.strm.next_out+=i,e.strm.avail_out-=i,e.strm.total_out+=i,e.block_start+=i,r-=i),r&&(Ee(e.strm,e.strm.output,e.strm.next_out,r),e.strm.next_out+=r,e.strm.avail_out-=r,e.strm.total_out+=r)}while(o===0);return s-=e.strm.avail_in,s&&(s>=e.w_size?(e.matches=2,e.window.set(e.strm.input.subarray(e.strm.next_in-e.w_size,e.strm.next_in),0),e.strstart=e.w_size,e.insert=e.strstart):(e.window_size-e.strstart<=s&&(e.strstart-=e.w_size,e.window.set(e.window.subarray(e.w_size,e.w_size+e.strstart),0),e.matches<2&&e.matches++,e.insert>e.strstart&&(e.insert=e.strstart)),e.window.set(e.strm.input.subarray(e.strm.next_in-s,e.strm.next_in),e.strstart),e.strstart+=s,e.insert+=s>e.w_size-e.insert?e.w_size-e.insert:s),e.block_start=e.strstart),e.high_water<e.strstart&&(e.high_water=e.strstart),o?Se:t!==0&&t!==4&&e.strm.avail_in===0&&e.strstart===e.block_start?be:(a=e.window_size-e.strstart,e.strm.avail_in>a&&e.block_start>=e.w_size&&(e.block_start-=e.w_size,e.strstart-=e.w_size,e.window.set(e.window.subarray(e.w_size,e.w_size+e.strstart),0),e.matches<2&&e.matches++,a+=e.w_size,e.insert>e.strstart&&(e.insert=e.strstart)),a>e.strm.avail_in&&(a=e.strm.avail_in),a&&(Ee(e.strm,e.window,e.strstart,a),e.strstart+=a,e.insert+=a>e.w_size-e.insert?e.w_size-e.insert:a),e.high_water<e.strstart&&(e.high_water=e.strstart),a=e.bi_valid+42>>3,a=e.pending_buf_size-a>65535?65535:e.pending_buf_size-a,n=a>e.w_size?e.w_size:a,i=e.strstart-e.block_start,(i>=n||(i||t===4)&&t!==0&&e.strm.avail_in===0&&i<=a)&&(r=i>a?a:i,o=+(t===4&&e.strm.avail_in===0&&r===i),me(e,e.block_start,r,o),e.block_start+=r,Te(e.strm)),o?xe:z)},Ae=(e,t)=>{let n,r;for(;;){if(e.lookahead<R){if(Oe(e),e.lookahead<R&&t===0)return z;if(e.lookahead===0)break}if(n=0,e.lookahead>=L&&(n=B(e,e.strstart)),n!==0&&e.strstart-n<=e.w_size-R&&(e.match_length=De(e,n)),e.match_length>=L)if(r=F(e,e.strstart-e.match_start,e.match_length-L),e.lookahead-=e.match_length,e.match_length<=e.max_lazy_match&&e.lookahead>=L){e.match_length--;do e.strstart++,n=B(e,e.strstart);while(--e.match_length!==0);e.strstart++}else e.strstart+=e.match_length,e.match_length=0,e.legacy_hash&&(e.ins_h=e.window[e.strstart],e.ins_h=we(e,e.ins_h,e.window[e.strstart+1]));else r=F(e,0,e.window[e.strstart]),e.lookahead--,e.strstart++;if(r&&(V(e,!1),e.strm.avail_out===0))return z}return e.insert=e.strstart<L-1?e.strstart:L-1,t===4?(V(e,!0),e.strm.avail_out===0?xe:Se):e.sym_next&&(V(e,!1),e.strm.avail_out===0)?z:be},H=(e,t)=>{let n,r,i;for(;;){if(e.lookahead<R){if(Oe(e),e.lookahead<R&&t===0)return z;if(e.lookahead===0)break}if(n=0,e.lookahead>=L&&(n=B(e,e.strstart)),e.prev_length=e.match_length,e.prev_match=e.match_start,e.match_length=L-1,n!==0&&e.prev_length<e.max_lazy_match&&e.strstart-n<=e.w_size-R&&(e.match_length=De(e,n),e.match_length<=5&&(e.strategy===1||e.match_length===L&&e.strstart-e.match_start>4096)&&(e.match_length=L-1)),e.prev_length>=L&&e.match_length<=e.prev_length){i=e.strstart+e.lookahead-L,r=F(e,e.strstart-1-e.prev_match,e.prev_length-L),e.lookahead-=e.prev_length-1,e.prev_length-=2;do++e.strstart<=i&&(n=B(e,e.strstart));while(--e.prev_length!==0);if(e.match_available=0,e.match_length=L-1,e.strstart++,r&&(V(e,!1),e.strm.avail_out===0))return z}else if(e.match_available){if(r=F(e,0,e.window[e.strstart-1]),r&&V(e,!1),e.strstart++,e.lookahead--,e.strm.avail_out===0)return z}else e.match_available=1,e.strstart++,e.lookahead--}return e.match_available&&(r=F(e,0,e.window[e.strstart-1]),e.match_available=0),e.insert=e.strstart<L-1?e.strstart:L-1,t===4?(V(e,!0),e.strm.avail_out===0?xe:Se):e.sym_next&&(V(e,!1),e.strm.avail_out===0)?z:be},U=class{constructor(e,t,n,r,i){this.good_length=e,this.max_lazy=t,this.nice_length=n,this.max_chain=r,this.func=i}};new U(0,0,0,0,ke),new U(4,4,8,4,Ae),new U(4,5,16,8,Ae),new U(4,6,32,32,Ae),new U(4,4,16,16,H),new U(8,16,32,32,H),new U(8,16,128,128,H),new U(8,32,128,256,H),new U(32,128,258,1024,H),new U(32,258,258,4096,H);var W=16209,je=16191;function Me(e,t){let n,r,i,a,o,s,c,l,u,d,f,p,m,h,g,_,v,y,b,x,S,C,w,T,E=e.state;n=e.next_in,w=e.input,r=n+(e.avail_in-5),i=e.next_out,T=e.output,a=i-(t-e.avail_out),o=i+(e.avail_out-257),s=E.dmax,c=E.wsize,l=E.whave,u=E.wnext,d=E.window,f=E.hold,p=E.bits,m=E.lencode,h=E.distcode,g=(1<<E.lenbits)-1,_=(1<<E.distbits)-1;top:do{p<15&&(f+=w[n++]<<p,p+=8,f+=w[n++]<<p,p+=8),v=m[f&g];dolen:for(;;){if(y=v>>>24,f>>>=y,p-=y,y=v>>>16&255,y===0)T[i++]=v&65535;else if(y&16){b=v&65535,y&=15,y&&(p<y&&(f+=w[n++]<<p,p+=8),b+=f&(1<<y)-1,f>>>=y,p-=y),p<15&&(f+=w[n++]<<p,p+=8,f+=w[n++]<<p,p+=8),v=h[f&_];dodist:for(;;){if(y=v>>>24,f>>>=y,p-=y,y=v>>>16&255,y&16){if(x=v&65535,y&=15,p<y&&(f+=w[n++]<<p,p+=8,p<y&&(f+=w[n++]<<p,p+=8)),x+=f&(1<<y)-1,x>s){e.msg=`invalid distance too far back`,E.mode=W;break top}if(f>>>=y,p-=y,y=i-a,x>y){if(y=x-y,y>l&&E.sane){e.msg=`invalid distance too far back`,E.mode=W;break top}if(S=0,C=d,u===0){if(S+=c-y,y<b){b-=y;do T[i++]=d[S++];while(--y);S=i-x,C=T}}else if(u<y){if(S+=c+u-y,y-=u,y<b){b-=y;do T[i++]=d[S++];while(--y);if(S=0,u<b){y=u,b-=y;do T[i++]=d[S++];while(--y);S=i-x,C=T}}}else if(S+=u-y,y<b){b-=y;do T[i++]=d[S++];while(--y);S=i-x,C=T}for(;b>2;)T[i++]=C[S++],T[i++]=C[S++],T[i++]=C[S++],b-=3;b&&(T[i++]=C[S++],b>1&&(T[i++]=C[S++]))}else{S=i-x;do T[i++]=T[S++],T[i++]=T[S++],T[i++]=T[S++],b-=3;while(b>2);b&&(T[i++]=T[S++],b>1&&(T[i++]=T[S++]))}}else if(y&64){e.msg=`invalid distance code`,E.mode=W;break top}else{v=h[(v&65535)+(f&(1<<y)-1)];continue dodist}break}}else if(!(y&64)){v=m[(v&65535)+(f&(1<<y)-1)];continue dolen}else if(y&32){E.mode=je;break top}else{e.msg=`invalid literal/length code`,E.mode=W;break top}break}}while(n<r&&i<o);b=p>>3,n-=b,p-=b<<3,f&=(1<<p)-1,e.next_in=n,e.next_out=i,e.avail_in=n<r?5+(r-n):5-(n-r),e.avail_out=i<o?257+(o-i):257-(i-o),E.hold=f,E.bits=p}var G=15,Ne=852,Pe=592,Fe=0,Ie=1,Le=2,Re=new Uint16Array([3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,0,0]),ze=new Uint8Array([16,16,16,16,16,16,16,16,17,17,17,17,18,18,18,18,19,19,19,19,20,20,20,20,21,21,21,21,16,199,75]),Be=new Uint16Array([1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577,0,0]),Ve=new Uint8Array([16,16,16,16,17,17,18,18,19,19,20,20,21,21,22,22,23,23,24,24,25,25,26,26,27,27,28,28,29,29,64,64]),K=(e,t,n,r,i,a,o,s)=>{let c=s.bits,l=0,u=0,d=0,f=0,p=0,m=0,h=0,g=0,_=0,v=0,y,b,x,S,C,w=null,T,E=new Uint16Array(16),D=new Uint16Array(16),O=null,k,A,j;for(l=0;l<=G;l++)E[l]=0;for(u=0;u<r;u++)E[t[n+u]]++;for(p=c,f=G;f>=1&&E[f]===0;f--);if(p>f&&(p=f),f===0)return i[a++]=20971520,i[a++]=20971520,s.bits=1,0;for(d=1;d<f&&E[d]===0;d++);for(p<d&&(p=d),g=1,l=1;l<=G;l++)if(g<<=1,g-=E[l],g<0)return-1;if(g>0&&(e===Fe||f!==1))return-1;for(D[1]=0,l=1;l<G;l++)D[l+1]=D[l]+E[l];for(u=0;u<r;u++)t[n+u]!==0&&(o[D[t[n+u]]++]=u);if(e===Fe?(w=O=o,T=20):e===Ie?(w=Re,O=ze,T=257):(w=Be,O=Ve,T=0),v=0,u=0,l=d,C=a,m=p,h=0,x=-1,_=1<<p,S=_-1,e===Ie&&_>Ne||e===Le&&_>Pe)return 1;for(;;){k=l-h,o[u]+1<T?(A=0,j=o[u]):o[u]>=T?(A=O[o[u]-T],j=w[o[u]-T]):(A=96,j=0),y=1<<l-h,b=1<<m,d=b;do b-=y,i[C+(v>>h)+b]=k<<24|A<<16|j|0;while(b!==0);for(y=1<<l-1;v&y;)y>>=1;if(y===0?v=0:(v&=y-1,v+=y),u++,--E[l]===0){if(l===f)break;l=t[n+o[u]]}if(l>p&&(v&S)!==x){for(h===0&&(h=p),C+=d,m=l-h,g=1<<m;m+h<f&&(g-=E[m+h],!(g<=0));)m++,g<<=1;if(_+=1<<m,e===Ie&&_>Ne||e===Le&&_>Pe)return 1;x=v&S,i[x]=p<<24|m<<16|C-a|0}}return v!==0&&(i[C+v]=l-h<<24|4194304),s.bits=p,0},He=0,Ue=1,We=2,q=16180,Ge=16181,Ke=16182,qe=16183,Je=16184,Ye=16185,Xe=16186,Ze=16187,Qe=16188,$e=16189,J=16190,Y=16191,et=16192,tt=16193,nt=16194,rt=16195,it=16196,at=16197,ot=16198,st=16199,ct=16200,lt=16201,ut=16202,dt=16203,ft=16204,pt=16205,mt=16206,ht=16207,gt=16208,X=16209,_t=16210,vt=16211,yt=852,bt=592,xt=e=>(e>>>24&255)+(e>>>8&65280)+((e&65280)<<8)+((e&255)<<24),St=class{constructor(){this.strm=null,this.mode=0,this.last=!1,this.wrap=0,this.havedict=!1,this.flags=0,this.dmax=0,this.check=0,this.total=0,this.head=null,this.wbits=0,this.wsize=0,this.whave=0,this.wnext=0,this.window=null,this.hold=0,this.bits=0,this.length=0,this.offset=0,this.extra=0,this.lencode=null,this.distcode=null,this.lenbits=0,this.distbits=0,this.ncode=0,this.nlen=0,this.ndist=0,this.have=0,this.next=null,this.lens=new Uint16Array(320),this.work=new Uint16Array(288),this.lendyn=null,this.distdyn=null,this.sane=0,this.back=0,this.was=0}},Z=e=>{if(!e)return 1;let t=e.state;return+(!t||t.strm!==e||t.mode<q||t.mode>vt)},Ct=e=>{if(Z(e))return-2;let t=e.state;return e.total_in=e.total_out=t.total=0,e.msg=``,t.wrap&&(e.adler=t.wrap&1),t.mode=q,t.last=0,t.havedict=0,t.flags=-1,t.dmax=32768,t.head=null,t.hold=0,t.bits=0,t.lencode=t.lendyn=new Int32Array(yt),t.distcode=t.distdyn=new Int32Array(bt),t.sane=1,t.back=-1,0},wt=e=>{if(Z(e))return-2;let t=e.state;return t.wsize=0,t.whave=0,t.wnext=0,Ct(e)},Tt=(e,t)=>{let n;if(Z(e))return-2;let r=e.state;return t<0?(n=0,t=-t):(n=(t>>4)+5,t<48&&(t&=15)),t&&(t<8||t>15)?-2:(r.window!==null&&r.wbits!==t&&(r.window=null),r.wrap=n,r.wbits=t,wt(e))},Et=(e,t)=>{if(!e)return-2;let n=new St;e.state=n,n.strm=e,n.window=null,n.mode=q;let r=Tt(e,t);return r!==0&&(e.state=null),r},Dt=!0,Ot,kt,At=e=>{if(Dt){Ot=new Int32Array(512),kt=new Int32Array(32);let t=0;for(;t<144;)e.lens[t++]=8;for(;t<256;)e.lens[t++]=9;for(;t<280;)e.lens[t++]=7;for(;t<288;)e.lens[t++]=8;for(K(Ue,e.lens,0,288,Ot,0,e.work,{bits:9}),t=0;t<32;)e.lens[t++]=5;K(We,e.lens,0,32,kt,0,e.work,{bits:5}),Dt=!1}e.lencode=Ot,e.lenbits=9,e.distcode=kt,e.distbits=5},jt=(e,t,n,r)=>{let i,a=e.state;return a.window===null&&(a.window=new Uint8Array(1<<a.wbits)),a.wsize===0&&(a.wsize=1<<a.wbits,a.wnext=0,a.whave=0),r>=a.wsize?(a.window.set(t.subarray(n-a.wsize,n),0),a.wnext=0,a.whave=a.wsize):(i=a.wsize-a.wnext,i>r&&(i=r),a.window.set(t.subarray(n-r,n-r+i),a.wnext),r-=i,r?(a.window.set(t.subarray(n-r,n),0),a.wnext=r,a.whave=a.wsize):(a.wnext+=i,a.wnext===a.wsize&&(a.wnext=0),a.whave<a.wsize&&(a.whave+=i))),0},Mt=(e,t)=>{let n,r,i,a,o,s,c,l,u,d,f,p,m,h,g=0,_,v,y,b,x,S,C,w,T=new Uint8Array(4),E,D,O=new Uint8Array([16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]);if(Z(e)||!e.output||!e.input&&e.avail_in!==0)return-2;n=e.state,n.mode===Y&&(n.mode=et),o=e.next_out,i=e.output,c=e.avail_out,a=e.next_in,r=e.input,s=e.avail_in,l=n.hold,u=n.bits,d=s,f=c,w=0;inf_leave:for(;;)switch(n.mode){case q:if(n.wrap===0){n.mode=et;break}for(;u<16;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(n.wrap&2&&l===35615){n.wbits===0&&(n.wbits=15),n.check=0,T[0]=l&255,T[1]=l>>>8&255,n.check=I(n.check,T,2,0),l=0,u=0,n.mode=Ge;break}if(n.head&&(n.head.done=!1),!(n.wrap&1)||(((l&255)<<8)+(l>>8))%31){e.msg=`incorrect header check`,n.mode=X;break}if((l&15)!=8){e.msg=`unknown compression method`,n.mode=X;break}if(l>>>=4,u-=4,C=(l&15)+8,n.wbits===0&&(n.wbits=C),C>15||C>n.wbits){e.msg=`invalid window size`,n.mode=X;break}n.dmax=1<<n.wbits,n.flags=0,e.adler=n.check=1,n.mode=l&512?$e:Y,l=0,u=0;break;case Ge:for(;u<16;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(n.flags=l,(n.flags&255)!=8){e.msg=`unknown compression method`,n.mode=X;break}if(n.flags&57344){e.msg=`unknown header flags set`,n.mode=X;break}n.head&&(n.head.text=l>>8&1),n.flags&512&&n.wrap&4&&(T[0]=l&255,T[1]=l>>>8&255,n.check=I(n.check,T,2,0)),l=0,u=0,n.mode=Ke;case Ke:for(;u<32;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}n.head&&(n.head.time=l),n.flags&512&&n.wrap&4&&(T[0]=l&255,T[1]=l>>>8&255,T[2]=l>>>16&255,T[3]=l>>>24&255,n.check=I(n.check,T,4,0)),l=0,u=0,n.mode=qe;case qe:for(;u<16;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}n.head&&(n.head.xflags=l&255,n.head.os=l>>8),n.flags&512&&n.wrap&4&&(T[0]=l&255,T[1]=l>>>8&255,n.check=I(n.check,T,2,0)),l=0,u=0,n.mode=Je;case Je:if(n.flags&1024){for(;u<16;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}n.length=l,n.head&&(n.head.extra_len=l),n.flags&512&&n.wrap&4&&(T[0]=l&255,T[1]=l>>>8&255,n.check=I(n.check,T,2,0)),l=0,u=0}else n.head&&(n.head.extra=null);n.mode=Ye;case Ye:if(n.flags&1024&&(p=n.length,p>s&&(p=s),p&&(n.head&&(C=n.head.extra_len-n.length,n.head.extra||(n.head.extra=new Uint8Array(n.head.extra_len)),n.head.extra.set(r.subarray(a,a+p),C)),n.flags&512&&n.wrap&4&&(n.check=I(n.check,r,p,a)),s-=p,a+=p,n.length-=p),n.length))break inf_leave;n.length=0,n.mode=Xe;case Xe:if(n.flags&2048){if(s===0)break inf_leave;p=0;do C=r[a+p++],n.head&&C&&n.length<65536&&(n.head.name+=String.fromCharCode(C));while(C&&p<s);if(n.flags&512&&n.wrap&4&&(n.check=I(n.check,r,p,a)),s-=p,a+=p,C)break inf_leave}else n.head&&(n.head.name=null);n.length=0,n.mode=Ze;case Ze:if(n.flags&4096){if(s===0)break inf_leave;p=0;do C=r[a+p++],n.head&&C&&n.length<65536&&(n.head.comment+=String.fromCharCode(C));while(C&&p<s);if(n.flags&512&&n.wrap&4&&(n.check=I(n.check,r,p,a)),s-=p,a+=p,C)break inf_leave}else n.head&&(n.head.comment=null);n.mode=Qe;case Qe:if(n.flags&512){for(;u<16;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(n.wrap&4&&l!==(n.check&65535)){e.msg=`header crc mismatch`,n.mode=X;break}l=0,u=0}n.head&&(n.head.hcrc=n.flags>>9&1,n.head.done=!0),e.adler=n.check=0,n.mode=Y;break;case $e:for(;u<32;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}e.adler=n.check=xt(l),l=0,u=0,n.mode=J;case J:if(n.havedict===0)return e.next_out=o,e.avail_out=c,e.next_in=a,e.avail_in=s,n.hold=l,n.bits=u,2;e.adler=n.check=1,n.mode=Y;case Y:if(t===5||t===6)break inf_leave;case et:if(n.last){l>>>=u&7,u-=u&7,n.mode=mt;break}for(;u<3;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}switch(n.last=l&1,l>>>=1,--u,l&3){case 0:n.mode=tt;break;case 1:if(At(n),n.mode=st,t===6){l>>>=2,u-=2;break inf_leave}break;case 2:n.mode=it;break;case 3:e.msg=`invalid block type`,n.mode=X}l>>>=2,u-=2;break;case tt:for(l>>>=u&7,u-=u&7;u<32;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if((l&65535)!=(l>>>16^65535)){e.msg=`invalid stored block lengths`,n.mode=X;break}if(n.length=l&65535,l=0,u=0,n.mode=nt,t===6)break inf_leave;case nt:n.mode=rt;case rt:if(p=n.length,p){if(p>s&&(p=s),p>c&&(p=c),p===0)break inf_leave;i.set(r.subarray(a,a+p),o),s-=p,a+=p,c-=p,o+=p,n.length-=p;break}n.mode=Y;break;case it:for(;u<14;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(n.nlen=(l&31)+257,l>>>=5,u-=5,n.ndist=(l&31)+1,l>>>=5,u-=5,n.ncode=(l&15)+4,l>>>=4,u-=4,n.nlen>286||n.ndist>30){e.msg=`too many length or distance symbols`,n.mode=X;break}n.have=0,n.mode=at;case at:for(;n.have<n.ncode;){for(;u<3;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}n.lens[O[n.have++]]=l&7,l>>>=3,u-=3}for(;n.have<19;)n.lens[O[n.have++]]=0;if(n.lencode=n.lendyn,n.lenbits=7,E={bits:n.lenbits},w=K(He,n.lens,0,19,n.lencode,0,n.work,E),n.lenbits=E.bits,w){e.msg=`invalid code lengths set`,n.mode=X;break}n.have=0,n.mode=ot;case ot:for(;n.have<n.nlen+n.ndist;){for(;g=n.lencode[l&(1<<n.lenbits)-1],_=g>>>24,v=g>>>16&255,y=g&65535,!(_<=u);){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(y<16)l>>>=_,u-=_,n.lens[n.have++]=y;else{if(y===16){for(D=_+2;u<D;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(l>>>=_,u-=_,n.have===0){e.msg=`invalid bit length repeat`,n.mode=X;break}C=n.lens[n.have-1],p=3+(l&3),l>>>=2,u-=2}else if(y===17){for(D=_+3;u<D;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}l>>>=_,u-=_,C=0,p=3+(l&7),l>>>=3,u-=3}else{for(D=_+7;u<D;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}l>>>=_,u-=_,C=0,p=11+(l&127),l>>>=7,u-=7}if(n.have+p>n.nlen+n.ndist){e.msg=`invalid bit length repeat`,n.mode=X;break}for(;p--;)n.lens[n.have++]=C}}if(n.mode===X)break;if(n.lens[256]===0){e.msg=`invalid code -- missing end-of-block`,n.mode=X;break}if(n.lenbits=9,E={bits:n.lenbits},w=K(Ue,n.lens,0,n.nlen,n.lencode,0,n.work,E),n.lenbits=E.bits,w){e.msg=`invalid literal/lengths set`,n.mode=X;break}if(n.distbits=6,n.distcode=n.distdyn,E={bits:n.distbits},w=K(We,n.lens,n.nlen,n.ndist,n.distcode,0,n.work,E),n.distbits=E.bits,w){e.msg=`invalid distances set`,n.mode=X;break}if(n.mode=st,t===6)break inf_leave;case st:n.mode=ct;case ct:if(s>=6&&c>=258){e.next_out=o,e.avail_out=c,e.next_in=a,e.avail_in=s,n.hold=l,n.bits=u,Me(e,f),o=e.next_out,i=e.output,c=e.avail_out,a=e.next_in,r=e.input,s=e.avail_in,l=n.hold,u=n.bits,n.mode===Y&&(n.back=-1);break}for(n.back=0;g=n.lencode[l&(1<<n.lenbits)-1],_=g>>>24,v=g>>>16&255,y=g&65535,!(_<=u);){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(v&&!(v&240)){for(b=_,x=v,S=y;g=n.lencode[S+((l&(1<<b+x)-1)>>b)],_=g>>>24,v=g>>>16&255,y=g&65535,!(b+_<=u);){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}l>>>=b,u-=b,n.back+=b}if(l>>>=_,u-=_,n.back+=_,n.length=y,v===0){n.mode=pt;break}if(v&32){n.back=-1,n.mode=Y;break}if(v&64){e.msg=`invalid literal/length code`,n.mode=X;break}n.extra=v&15,n.mode=lt;case lt:if(n.extra){for(D=n.extra;u<D;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}n.length+=l&(1<<n.extra)-1,l>>>=n.extra,u-=n.extra,n.back+=n.extra}n.was=n.length,n.mode=ut;case ut:for(;g=n.distcode[l&(1<<n.distbits)-1],_=g>>>24,v=g>>>16&255,y=g&65535,!(_<=u);){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(!(v&240)){for(b=_,x=v,S=y;g=n.distcode[S+((l&(1<<b+x)-1)>>b)],_=g>>>24,v=g>>>16&255,y=g&65535,!(b+_<=u);){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}l>>>=b,u-=b,n.back+=b}if(l>>>=_,u-=_,n.back+=_,v&64){e.msg=`invalid distance code`,n.mode=X;break}n.offset=y,n.extra=v&15,n.mode=dt;case dt:if(n.extra){for(D=n.extra;u<D;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}n.offset+=l&(1<<n.extra)-1,l>>>=n.extra,u-=n.extra,n.back+=n.extra}if(n.offset>n.dmax){e.msg=`invalid distance too far back`,n.mode=X;break}n.mode=ft;case ft:if(c===0)break inf_leave;if(p=f-c,n.offset>p){if(p=n.offset-p,p>n.whave&&n.sane){e.msg=`invalid distance too far back`,n.mode=X;break}p>n.wnext?(p-=n.wnext,m=n.wsize-p):m=n.wnext-p,p>n.length&&(p=n.length),h=n.window}else h=i,m=o-n.offset,p=n.length;p>c&&(p=c),c-=p,n.length-=p;do i[o++]=h[m++];while(--p);n.length===0&&(n.mode=ct);break;case pt:if(c===0)break inf_leave;i[o++]=n.length,c--,n.mode=ct;break;case mt:if(n.wrap){for(;u<32;){if(s===0)break inf_leave;s--,l|=r[a++]<<u,u+=8}if(f-=c,e.total_out+=f,n.total+=f,n.wrap&4&&f&&(e.adler=n.check=n.flags?I(n.check,i,f,o-f):ge(n.check,i,f,o-f)),f=c,n.wrap&4&&(n.flags?l:xt(l))!==n.check){e.msg=`incorrect data check`,n.mode=X;break}l=0,u=0}n.mode=ht;case ht:if(n.wrap&&n.flags){for(;u<32;){if(s===0)break inf_leave;s--,l+=r[a++]<<u,u+=8}if(n.wrap&4&&l!==(n.total&4294967295)){e.msg=`incorrect length check`,n.mode=X;break}l=0,u=0}n.mode=gt;case gt:w=1;break inf_leave;case X:w=-3;break inf_leave;case _t:return-4;case vt:default:return-2}return e.next_out=o,e.avail_out=c,e.next_in=a,e.avail_in=s,n.hold=l,n.bits=u,(n.wsize||f!==e.avail_out&&n.mode<X&&(n.mode<mt||t!==4))&&jt(e,e.output,e.next_out,f-e.avail_out)?(n.mode=_t,-4):(d-=e.avail_in,f-=e.avail_out,e.total_in+=d,e.total_out+=f,n.total+=f,n.wrap&4&&f&&(e.adler=n.check=n.flags?I(n.check,i,f,e.next_out-f):ge(n.check,i,f,e.next_out-f)),e.data_type=n.bits+(n.last?64:0)+(n.mode===Y?128:0)+(n.mode===st||n.mode===nt?256:0),(d===0&&f===0||t===4)&&w===0&&(w=-5),w)},Nt=e=>{if(Z(e))return-2;let t=e.state;return t.window&&(t.window=null),e.state=null,0},Pt=(e,t)=>{let n=t.length,r,i,a;return Z(e)||(r=e.state,r.wrap!==0&&r.mode!==J)?-2:r.mode===J&&(i=1,i=ge(i,t,n,0),i!==r.check)?-3:(a=jt(e,t,n,n),a?(r.mode=_t,-4):(r.havedict=1,0))},Ft=class{constructor(){this.input=null,this.next_in=0,this.avail_in=0,this.total_in=0,this.output=null,this.next_out=0,this.avail_out=0,this.total_out=0,this.msg=``,this.state=null,this.data_type=2,this.adler=0}},It=e=>{let t=new Uint8Array(e.reduce((e,t)=>e+t.length,0)),n=0;for(let r of e)t.set(r,n),n+=r.length;return t};function Q(e){"@babel/helpers - typeof";return Q=typeof Symbol==`function`&&typeof Symbol.iterator==`symbol`?function(e){return typeof e}:function(e){return e&&typeof Symbol==`function`&&e.constructor===Symbol&&e!==Symbol.prototype?`symbol`:typeof e},Q(e)}function Lt(e,t){if(Q(e)!=`object`||!e)return e;var n=e[Symbol.toPrimitive];if(n!==void 0){var r=n.call(e,t||`default`);if(Q(r)!=`object`)return r;throw TypeError(`@@toPrimitive must return a primitive value.`)}return(t===`string`?String:Number)(e)}function Rt(e){var t=Lt(e,`string`);return Q(t)==`symbol`?t:t+``}function $(e,t,n){return(t=Rt(t))in e?Object.defineProperty(e,t,{value:n,enumerable:!0,configurable:!0,writable:!0}):e[t]=n,e}function zt(e,t){var n=Object.keys(e);if(Object.getOwnPropertySymbols){var r=Object.getOwnPropertySymbols(e);t&&(r=r.filter(function(t){return Object.getOwnPropertyDescriptor(e,t).enumerable})),n.push.apply(n,r)}return n}function Bt(e){for(var t=1;t<arguments.length;t++){var n=arguments[t]==null?{}:arguments[t];t%2?zt(Object(n),!0).forEach(function(t){$(e,t,n[t])}):Object.getOwnPropertyDescriptors?Object.defineProperties(e,Object.getOwnPropertyDescriptors(n)):zt(Object(n)).forEach(function(t){Object.defineProperty(e,t,Object.getOwnPropertyDescriptor(n,t))})}return e}var Vt=Object.prototype.toString,Ht={chunkSize:1024*64,windowBits:15,raw:!1,dictionary:new Uint8Array},Ut=class{constructor(e={}){$(this,`options`,void 0),$(this,`err`,void 0),$(this,`msg`,void 0),$(this,`ended`,void 0),$(this,`started`,void 0),$(this,`chunks`,void 0),$(this,`strm`,void 0),$(this,`result`,void 0),this.options=Object.assign({},Ht,e);let t=this.options;t.raw&&t.windowBits>=0&&t.windowBits<16&&(t.windowBits=-t.windowBits,t.windowBits===0&&(t.windowBits=-15)),t.windowBits>=0&&t.windowBits<16&&!e.windowBits&&(t.windowBits+=32),t.windowBits>15&&t.windowBits<48&&(t.windowBits&15||(t.windowBits|=15)),this.err=0,this.msg=``,this.ended=!1,this.started=!1,this.chunks=[],this.result=new Uint8Array,this.strm=new Ft,this.strm.avail_out=0;let n=Et(this.strm,t.windowBits);if(n!==0)throw Error(ve[n]);Vt.call(t.dictionary)===`[object ArrayBuffer]`&&(t.dictionary=new Uint8Array(t.dictionary));let r=t.dictionary;if(t.raw&&r.length&&(n=Pt(this.strm,r),n!==0))throw Error(ve[n])}push(e,t=!1){let n=this.strm,r=this.options.chunkSize,i,a,o;if(this.ended)return this.err===0;for(a=typeof t==`number`?t:t===!0?4:0,Vt.call(e)===`[object ArrayBuffer]`?n.input=new Uint8Array(e):n.input=e,n.next_in=0,n.avail_in=n.input.length,this.started||(this.started=!0,this.onStart(n));;){if(n.avail_out===0&&(n.output=new Uint8Array(r),n.next_out=0,n.avail_out=r),i=Mt(n,a),i===2){let e=this.options.dictionary;e.length&&(i=Pt(n,e),i===0?i=Mt(n,a):i===-3&&(i=2))}for(;n.avail_in>0&&i===1&&n.state.wrap&2&&n.state.flags!==0&&n.input[n.next_in]!==0;)wt(n),i=Mt(n,a);if(i===-2||i===-3||i===2||i===-4)break;if(o=n.avail_out,n.next_out&&(n.avail_out===0||i===1||a>0)&&(this.onData(n.output.length===n.next_out?n.output:n.output.subarray(0,n.next_out)),n.avail_out=0,n.next_out=0),!((i===0||i===-5)&&o===0)){if(i===1){i=Nt(this.strm);break}if(n.avail_in===0){if(a===4){i=Nt(this.strm),i===0&&(i=-5);break}return!0}}}return this.err=i,this.msg=n.msg||ve[i],this.ended=!0,this.onEnd(i),i===0}onStart(e){}onData(e){this.chunks.push(e)}onEnd(e){e===0&&(this.result=It(this.chunks)),this.chunks=[]}};function Wt(e,t={}){let n=new Ut(t);if(n.push(e,!0),n.err)throw Error(n.msg);let r=n.result;return t.toText?new TextDecoder().decode(r):r}function Gt(e,t={}){return Wt(e,Bt(Bt({},t),{},{raw:!0}))}e.Inflate=Ut,e.inflate=Wt,e.ungzip=Wt,e.inflateRaw=Gt});
+
+</script>
+<script>
+/* UTIF.js — decodificatore TIFF, MIT License, Copyright (c) 2017 Photopea.
+   Incluso perché Chrome ed Edge non sanno leggere il TIFF da soli. */
+
+
+
+
+;(function(){
+var UTIF = {};
+
+// Make available for import by `require()`
+if (typeof module == "object") {module.exports = UTIF;}
+else {self.UTIF = UTIF;}
+
+var pako;
+if (typeof require == "function") {pako = require("pako");}
+else {pako = self.pako;}
+
+function log() { if (typeof process=="undefined" || process.env.NODE_ENV=="development") console.log.apply(console, arguments);  }
+
+(function(UTIF, pako){
+	
+// Following lines add a JPEG decoder  to UTIF.JpegDecoder
+(function(){var V="function"===typeof Symbol&&"symbol"===typeof Symbol.iterator?function(g){return typeof g}:function(g){return g&&"function"===typeof Symbol&&g.constructor===Symbol&&g!==Symbol.prototype?"symbol":typeof g},D=function(){function g(g){this.message="JPEG error: "+g}g.prototype=Error();g.prototype.name="JpegError";return g.constructor=g}(),P=function(){function g(g,D){this.message=g;this.g=D}g.prototype=Error();g.prototype.name="DNLMarkerError";return g.constructor=g}();(function(){function g(){this.M=
+null;this.B=-1}function W(a,d){for(var f=0,e=[],b,B,k=16;0<k&&!a[k-1];)k--;e.push({children:[],index:0});var l=e[0],r;for(b=0;b<k;b++){for(B=0;B<a[b];B++){l=e.pop();for(l.children[l.index]=d[f];0<l.index;)l=e.pop();l.index++;for(e.push(l);e.length<=b;)e.push(r={children:[],index:0}),l.children[l.index]=r.children,l=r;f++}b+1<k&&(e.push(r={children:[],index:0}),l.children[l.index]=r.children,l=r)}return e[0].children}function X(a,d,f,e,b,B,k,l,r){function n(){if(0<x)return x--,z>>x&1;z=a[d++];if(255===
+z){var c=a[d++];if(c){if(220===c&&g){d+=2;var b=a[d++]<<8|a[d++];if(0<b&&b!==f.g)throw new P("Found DNL marker (0xFFDC) while parsing scan data",b);}throw new D("unexpected marker "+(z<<8|c).toString(16));}}x=7;return z>>>7}function q(a){for(;;){a=a[n()];if("number"===typeof a)return a;if("object"!==("undefined"===typeof a?"undefined":V(a)))throw new D("invalid huffman sequence");}}function h(a){for(var c=0;0<a;)c=c<<1|n(),a--;return c}function c(a){if(1===a)return 1===n()?1:-1;var c=h(a);return c>=
+1<<a-1?c:c+(-1<<a)+1}function C(a,b){var d=q(a.D);d=0===d?0:c(d);a.a[b]=a.m+=d;for(d=1;64>d;){var h=q(a.o),k=h&15;h>>=4;if(0===k){if(15>h)break;d+=16}else d+=h,a.a[b+J[d]]=c(k),d++}}function w(a,d){var b=q(a.D);b=0===b?0:c(b)<<r;a.a[d]=a.m+=b}function p(a,c){a.a[c]|=n()<<r}function m(a,b){if(0<A)A--;else for(var d=B;d<=k;){var e=q(a.o),f=e&15;e>>=4;if(0===f){if(15>e){A=h(e)+(1<<e)-1;break}d+=16}else d+=e,a.a[b+J[d]]=c(f)*(1<<r),d++}}function t(a,d){for(var b=B,e=0,f;b<=k;){f=d+J[b];var l=0>a.a[f]?
+-1:1;switch(E){case 0:e=q(a.o);f=e&15;e>>=4;if(0===f)15>e?(A=h(e)+(1<<e),E=4):(e=16,E=1);else{if(1!==f)throw new D("invalid ACn encoding");Q=c(f);E=e?2:3}continue;case 1:case 2:a.a[f]?a.a[f]+=l*(n()<<r):(e--,0===e&&(E=2===E?3:0));break;case 3:a.a[f]?a.a[f]+=l*(n()<<r):(a.a[f]=Q<<r,E=0);break;case 4:a.a[f]&&(a.a[f]+=l*(n()<<r))}b++}4===E&&(A--,0===A&&(E=0))}var g=9<arguments.length&&void 0!==arguments[9]?arguments[9]:!1,u=f.P,v=d,z=0,x=0,A=0,E=0,Q,K=e.length,F,L,M,I;var R=f.S?0===B?0===l?w:p:0===l?
+m:t:C;var G=0;var O=1===K?e[0].c*e[0].l:u*f.O;for(var S,T;G<O;){var U=b?Math.min(O-G,b):O;for(F=0;F<K;F++)e[F].m=0;A=0;if(1===K){var y=e[0];for(I=0;I<U;I++)R(y,64*((y.c+1)*(G/y.c|0)+G%y.c)),G++}else for(I=0;I<U;I++){for(F=0;F<K;F++)for(y=e[F],S=y.h,T=y.j,L=0;L<T;L++)for(M=0;M<S;M++)R(y,64*((y.c+1)*((G/u|0)*y.j+L)+(G%u*y.h+M)));G++}x=0;(y=N(a,d))&&y.f&&((0,_util.warn)("decodeScan - unexpected MCU data, current marker is: "+y.f),d=y.offset);y=y&&y.F;if(!y||65280>=y)throw new D("marker was not found");
+if(65488<=y&&65495>=y)d+=2;else break}(y=N(a,d))&&y.f&&((0,_util.warn)("decodeScan - unexpected Scan data, current marker is: "+y.f),d=y.offset);return d-v}function Y(a,d){for(var f=d.c,e=d.l,b=new Int16Array(64),B=0;B<e;B++)for(var k=0;k<f;k++){var l=64*((d.c+1)*B+k),r=b,n=d.G,q=d.a;if(!n)throw new D("missing required Quantization Table.");for(var h=0;64>h;h+=8){var c=q[l+h];var C=q[l+h+1];var w=q[l+h+2];var p=q[l+h+3];var m=q[l+h+4];var t=q[l+h+5];var g=q[l+h+6];var u=q[l+h+7];c*=n[h];if(0===(C|
+w|p|m|t|g|u))c=5793*c+512>>10,r[h]=c,r[h+1]=c,r[h+2]=c,r[h+3]=c,r[h+4]=c,r[h+5]=c,r[h+6]=c,r[h+7]=c;else{C*=n[h+1];w*=n[h+2];p*=n[h+3];m*=n[h+4];t*=n[h+5];g*=n[h+6];u*=n[h+7];var v=5793*c+128>>8;var z=5793*m+128>>8;var x=w;var A=g;m=2896*(C-u)+128>>8;u=2896*(C+u)+128>>8;p<<=4;t<<=4;v=v+z+1>>1;z=v-z;c=3784*x+1567*A+128>>8;x=1567*x-3784*A+128>>8;A=c;m=m+t+1>>1;t=m-t;u=u+p+1>>1;p=u-p;v=v+A+1>>1;A=v-A;z=z+x+1>>1;x=z-x;c=2276*m+3406*u+2048>>12;m=3406*m-2276*u+2048>>12;u=c;c=799*p+4017*t+2048>>12;p=4017*
+p-799*t+2048>>12;t=c;r[h]=v+u;r[h+7]=v-u;r[h+1]=z+t;r[h+6]=z-t;r[h+2]=x+p;r[h+5]=x-p;r[h+3]=A+m;r[h+4]=A-m}}for(n=0;8>n;++n)c=r[n],C=r[n+8],w=r[n+16],p=r[n+24],m=r[n+32],t=r[n+40],g=r[n+48],u=r[n+56],0===(C|w|p|m|t|g|u)?(c=5793*c+8192>>14,c=-2040>c?0:2024<=c?255:c+2056>>4,q[l+n]=c,q[l+n+8]=c,q[l+n+16]=c,q[l+n+24]=c,q[l+n+32]=c,q[l+n+40]=c,q[l+n+48]=c,q[l+n+56]=c):(v=5793*c+2048>>12,z=5793*m+2048>>12,x=w,A=g,m=2896*(C-u)+2048>>12,u=2896*(C+u)+2048>>12,v=(v+z+1>>1)+4112,z=v-z,c=3784*x+1567*A+2048>>
+12,x=1567*x-3784*A+2048>>12,A=c,m=m+t+1>>1,t=m-t,u=u+p+1>>1,p=u-p,v=v+A+1>>1,A=v-A,z=z+x+1>>1,x=z-x,c=2276*m+3406*u+2048>>12,m=3406*m-2276*u+2048>>12,u=c,c=799*p+4017*t+2048>>12,p=4017*p-799*t+2048>>12,t=c,c=v+u,u=v-u,C=z+t,g=z-t,w=x+p,t=x-p,p=A+m,m=A-m,c=16>c?0:4080<=c?255:c>>4,C=16>C?0:4080<=C?255:C>>4,w=16>w?0:4080<=w?255:w>>4,p=16>p?0:4080<=p?255:p>>4,m=16>m?0:4080<=m?255:m>>4,t=16>t?0:4080<=t?255:t>>4,g=16>g?0:4080<=g?255:g>>4,u=16>u?0:4080<=u?255:u>>4,q[l+n]=c,q[l+n+8]=C,q[l+n+16]=w,q[l+n+24]=
+p,q[l+n+32]=m,q[l+n+40]=t,q[l+n+48]=g,q[l+n+56]=u)}return d.a}function N(a,d){var f=2<arguments.length&&void 0!==arguments[2]?arguments[2]:d,e=a.length-1;f=f<d?f:d;if(d>=e)return null;var b=a[d]<<8|a[d+1];if(65472<=b&&65534>=b)return{f:null,F:b,offset:d};for(var B=a[f]<<8|a[f+1];!(65472<=B&&65534>=B);){if(++f>=e)return null;B=a[f]<<8|a[f+1]}return{f:b.toString(16),F:B,offset:f}}var J=new Uint8Array([0,1,8,16,9,2,3,10,17,24,32,25,18,11,4,5,12,19,26,33,40,48,41,34,27,20,13,6,7,14,21,28,35,42,49,56,
+57,50,43,36,29,22,15,23,30,37,44,51,58,59,52,45,38,31,39,46,53,60,61,54,47,55,62,63]);g.prototype={parse:function(a){function d(){var d=a[k]<<8|a[k+1];k+=2;return d}function f(){var b=d();b=k+b-2;var c=N(a,b,k);c&&c.f&&((0,_util.warn)("readDataBlock - incorrect length, current marker is: "+c.f),b=c.offset);b=a.subarray(k,b);k+=b.length;return b}function e(a){for(var b=Math.ceil(a.v/8/a.s),c=Math.ceil(a.g/8/a.u),d=0;d<a.b.length;d++){v=a.b[d];var e=Math.ceil(Math.ceil(a.v/8)*v.h/a.s),f=Math.ceil(Math.ceil(a.g/
+8)*v.j/a.u);v.a=new Int16Array(64*c*v.j*(b*v.h+1));v.c=e;v.l=f}a.P=b;a.O=c}var b=(1<arguments.length&&void 0!==arguments[1]?arguments[1]:{}).N,B=void 0===b?null:b,k=0,l=null,r=0;b=[];var n=[],q=[],h=d();if(65496!==h)throw new D("SOI not found");for(h=d();65497!==h;){switch(h){case 65504:case 65505:case 65506:case 65507:case 65508:case 65509:case 65510:case 65511:case 65512:case 65513:case 65514:case 65515:case 65516:case 65517:case 65518:case 65519:case 65534:var c=f();65518===h&&65===c[0]&&100===
+c[1]&&111===c[2]&&98===c[3]&&101===c[4]&&(l={version:c[5]<<8|c[6],Y:c[7]<<8|c[8],Z:c[9]<<8|c[10],W:c[11]});break;case 65499:h=d()+k-2;for(var g;k<h;){var w=a[k++],p=new Uint16Array(64);if(0===w>>4)for(c=0;64>c;c++)g=J[c],p[g]=a[k++];else if(1===w>>4)for(c=0;64>c;c++)g=J[c],p[g]=d();else throw new D("DQT - invalid table spec");b[w&15]=p}break;case 65472:case 65473:case 65474:if(m)throw new D("Only single frame JPEGs supported");d();var m={};m.X=65473===h;m.S=65474===h;m.precision=a[k++];h=d();m.g=
+B||h;m.v=d();m.b=[];m.C={};c=a[k++];for(h=p=w=0;h<c;h++){g=a[k];var t=a[k+1]>>4;var H=a[k+1]&15;w<t&&(w=t);p<H&&(p=H);t=m.b.push({h:t,j:H,T:a[k+2],G:null});m.C[g]=t-1;k+=3}m.s=w;m.u=p;e(m);break;case 65476:g=d();for(h=2;h<g;){w=a[k++];p=new Uint8Array(16);for(c=t=0;16>c;c++,k++)t+=p[c]=a[k];H=new Uint8Array(t);for(c=0;c<t;c++,k++)H[c]=a[k];h+=17+t;(0===w>>4?q:n)[w&15]=W(p,H)}break;case 65501:d();var u=d();break;case 65498:c=1===++r&&!B;d();w=a[k++];g=[];for(h=0;h<w;h++){p=m.C[a[k++]];var v=m.b[p];
+p=a[k++];v.D=q[p>>4];v.o=n[p&15];g.push(v)}h=a[k++];w=a[k++];p=a[k++];try{var z=X(a,k,m,g,u,h,w,p>>4,p&15,c);k+=z}catch(x){if(x instanceof P)return(0,_util.warn)('Attempting to re-parse JPEG image using "scanLines" parameter found in DNL marker (0xFFDC) segment.'),this.parse(a,{N:x.g});throw x;}break;case 65500:k+=4;break;case 65535:255!==a[k]&&k--;break;default:if(255===a[k-3]&&192<=a[k-2]&&254>=a[k-2])k-=3;else if((c=N(a,k-2))&&c.f)(0,_util.warn)("JpegImage.parse - unexpected data, current marker is: "+
+c.f),k=c.offset;else throw new D("unknown marker "+h.toString(16));}h=d()}this.width=m.v;this.height=m.g;this.A=l;this.b=[];for(h=0;h<m.b.length;h++){v=m.b[h];if(u=b[v.T])v.G=u;this.b.push({R:Y(m,v),U:v.h/m.s,V:v.j/m.u,c:v.c,l:v.l})}this.i=this.b.length},L:function(a,d){var f=this.width/a,e=this.height/d,b,g,k=this.b.length,l=a*d*k,r=new Uint8ClampedArray(l),n=new Uint32Array(a);for(g=0;g<k;g++){var q=this.b[g];var h=q.U*f;var c=q.V*e;var C=g;var w=q.R;var p=q.c+1<<3;for(b=0;b<a;b++)q=0|b*h,n[b]=
+(q&4294967288)<<3|q&7;for(h=0;h<d;h++)for(q=0|h*c,q=p*(q&4294967288)|(q&7)<<3,b=0;b<a;b++)r[C]=w[q+n[b]],C+=k}if(e=this.M)for(g=0;g<l;)for(f=q=0;q<k;q++,g++,f+=2)r[g]=(r[g]*e[f]>>8)+e[f+1];return r},w:function(){return this.A?!!this.A.W:3===this.i?0===this.B?!1:!0:1===this.B?!0:!1},I:function(a){for(var d,f,e,b=0,g=a.length;b<g;b+=3)d=a[b],f=a[b+1],e=a[b+2],a[b]=d-179.456+1.402*e,a[b+1]=d+135.459-.344*f-.714*e,a[b+2]=d-226.816+1.772*f;return a},K:function(a){for(var d,f,e,b,g=0,k=0,l=a.length;k<l;k+=
+4)d=a[k],f=a[k+1],e=a[k+2],b=a[k+3],a[g++]=-122.67195406894+f*(-6.60635669420364E-5*f+4.37130475926232E-4*e-5.4080610064599E-5*d+4.8449797120281E-4*b-.154362151871126)+e*(-9.57964378445773E-4*e+8.17076911346625E-4*d-.00477271405408747*b+1.53380253221734)+d*(9.61250184130688E-4*d-.00266257332283933*b+.48357088451265)+b*(-3.36197177618394E-4*b+.484791561490776),a[g++]=107.268039397724+f*(2.19927104525741E-5*f-6.40992018297945E-4*e+6.59397001245577E-4*d+4.26105652938837E-4*b-.176491792462875)+e*(-7.78269941513683E-4*
+e+.00130872261408275*d+7.70482631801132E-4*b-.151051492775562)+d*(.00126935368114843*d-.00265090189010898*b+.25802910206845)+b*(-3.18913117588328E-4*b-.213742400323665),a[g++]=-20.810012546947+f*(-5.70115196973677E-4*f-2.63409051004589E-5*e+.0020741088115012*d-.00288260236853442*b+.814272968359295)+e*(-1.53496057440975E-5*e-1.32689043961446E-4*d+5.60833691242812E-4*b-.195152027534049)+d*(.00174418132927582*d-.00255243321439347*b+.116935020465145)+b*(-3.43531996510555E-4*b+.24165260232407);return a.subarray(0,
+g)},J:function(a){for(var d,f,e,b=0,g=a.length;b<g;b+=4)d=a[b],f=a[b+1],e=a[b+2],a[b]=434.456-d-1.402*e,a[b+1]=119.541-d+.344*f+.714*e,a[b+2]=481.816-d-1.772*f;return a},H:function(a){for(var d,f,e,b,g=0,k=1/255,l=0,r=a.length;l<r;l+=4)d=a[l]*k,f=a[l+1]*k,e=a[l+2]*k,b=a[l+3]*k,a[g++]=255+d*(-4.387332384609988*d+54.48615194189176*f+18.82290502165302*e+212.25662451639585*b-285.2331026137004)+f*(1.7149763477362134*f-5.6096736904047315*e-17.873870861415444*b-5.497006427196366)+e*(-2.5217340131683033*
+e-21.248923337353073*b+17.5119270841813)-b*(21.86122147463605*b+189.48180835922747),a[g++]=255+d*(8.841041422036149*d+60.118027045597366*f+6.871425592049007*e+31.159100130055922*b-79.2970844816548)+f*(-15.310361306967817*f+17.575251261109482*e+131.35250912493976*b-190.9453302588951)+e*(4.444339102852739*e+9.8632861493405*b-24.86741582555878)-b*(20.737325471181034*b+187.80453709719578),a[g++]=255+d*(.8842522430003296*d+8.078677503112928*f+30.89978309703729*e-.23883238689178934*b-14.183576799673286)+
+f*(10.49593273432072*f+63.02378494754052*e+50.606957656360734*b-112.23884253719248)+e*(.03296041114873217*e+115.60384449646641*b-193.58209356861505)-b*(22.33816807309886*b+180.12613974708367);return a.subarray(0,g)},getData:function(a,d,f){if(4<this.i)throw new D("Unsupported color mode");a=this.L(a,d);if(1===this.i&&f){f=a.length;d=new Uint8ClampedArray(3*f);for(var e=0,b=0;b<f;b++){var g=a[b];d[e++]=g;d[e++]=g;d[e++]=g}return d}if(3===this.i&&this.w())return this.I(a);if(4===this.i){if(this.w())return f?
+this.K(a):this.J(a);if(f)return this.H(a)}return a}}; UTIF.JpegDecoder=g})()})();
+
+//UTIF.JpegDecoder = PDFJS.JpegImage;
+
+
+UTIF.encodeImage = function(rgba, w, h, metadata)
+{
+	var idf = { "t256":[w], "t257":[h], "t258":[8,8,8,8], "t259":[1], "t262":[2], "t273":[1000], // strips offset
+				"t277":[4], "t278":[h], /* rows per strip */          "t279":[w*h*4], // strip byte counts
+				"t282":[1], "t283":[1], "t284":[1], "t286":[0], "t287":[0], "t296":[1], "t305": ["Photopea (UTIF.js)"], "t338":[1]
+		};
+	if (metadata) for (var i in metadata) idf[i] = metadata[i];
+	
+	var prfx = new Uint8Array(UTIF.encode([idf]));
+	var img = new Uint8Array(rgba);
+	var data = new Uint8Array(1000+w*h*4);
+	for(var i=0; i<prfx.length; i++) data[i] = prfx[i];
+	for(var i=0; i<img .length; i++) data[1000+i] = img[i];
+	return data.buffer;
+}
+
+UTIF.encode = function(ifds)
+{
+	var data = new Uint8Array(20000), offset = 4, bin = UTIF._binBE;
+	data[0]=77;  data[1]=77;  data[3]=42;
+
+	var ifdo = 8;
+	bin.writeUint(data, offset, ifdo);  offset+=4;
+	for(var i=0; i<ifds.length; i++)
+	{
+		var noffs = UTIF._writeIFD(bin, data, ifdo, ifds[i]);
+		ifdo = noffs[1];
+		if(i<ifds.length-1) bin.writeUint(data, noffs[0], ifdo);
+	}
+	return data.slice(0, ifdo).buffer;
+}
+//UTIF.encode._writeIFD
+
+UTIF.decode = function(buff)
+{
+	UTIF.decode._decodeG3.allow2D = null;
+	var data = new Uint8Array(buff), offset = 0;
+
+	var id = UTIF._binBE.readASCII(data, offset, 2);  offset+=2;
+	var bin = id=="II" ? UTIF._binLE : UTIF._binBE;
+	var num = bin.readUshort(data, offset);  offset+=2;
+
+	var ifdo = bin.readUint(data, offset);  offset+=4;
+	var ifds = [];
+	while(true) {
+		var noff = UTIF._readIFD(bin, data, ifdo, ifds, 0, false);
+		ifdo = bin.readUint(data, noff);
+		if(ifdo==0) break;
+	}
+	return ifds;
+}
+
+UTIF.decodeImage = function(buff, img, ifds)
+{
+	var data = new Uint8Array(buff);
+	var id = UTIF._binBE.readASCII(data, 0, 2);
+
+	if(img["t256"]==null) return;	// No width => probably not an image
+	img.isLE = id=="II";
+	img.width  = img["t256"][0];  //delete img["t256"];
+	img.height = img["t257"][0];  //delete img["t257"];
+
+	var cmpr   = img["t259"] ? img["t259"][0] : 1;  //delete img["t259"];
+	var fo = img["t266"] ? img["t266"][0] : 1;  //delete img["t266"];
+	if(img["t284"] && img["t284"][0]==2) log("PlanarConfiguration 2 should not be used!");
+
+	var bipp;  // bits per pixel
+	if(img["t258"]) bipp = Math.min(32,img["t258"][0])*img["t258"].length;
+	else            bipp = (img["t277"]?img["t277"][0]:1);  
+	// Some .NEF files have t258==14, even though they use 16 bits per pixel
+	if(cmpr==1 && img["t279"]!=null && img["t278"] && img["t262"][0]==32803)  {
+		bipp = Math.round((img["t279"][0]*8)/(img.width*img["t278"][0]));
+	}
+	var bipl = Math.ceil(img.width*bipp/8)*8;
+	var soff = img["t273"];  if(soff==null) soff = img["t324"];
+	var bcnt = img["t279"];  if(cmpr==1 && soff.length==1) bcnt = [img.height*(bipl>>>3)];  if(bcnt==null) bcnt = img["t325"];
+	var bytes = new Uint8Array(img.height*(bipl>>>3)), bilen = 0;
+
+	if(img["t322"]!=null) // tiled
+	{
+		var tw = img["t322"][0], th = img["t323"][0];
+		var tx = Math.floor((img.width  + tw - 1) / tw);
+		var ty = Math.floor((img.height + th - 1) / th);
+		var tbuff = new Uint8Array(Math.ceil(tw*th*bipp/8)|0);
+		for(var y=0; y<ty; y++)
+			for(var x=0; x<tx; x++)
+			{
+				var i = y*tx+x;  for(var j=0; j<tbuff.length; j++) tbuff[j]=0;
+				UTIF.decode._decompress(img,ifds, data, soff[i], bcnt[i], cmpr, tbuff, 0, fo);
+				// Might be required for 7 too. Need to check
+				if (cmpr==6) bytes = tbuff;
+				else UTIF._copyTile(tbuff, Math.ceil(tw*bipp/8)|0, th, bytes, Math.ceil(img.width*bipp/8)|0, img.height, Math.ceil(x*tw*bipp/8)|0, y*th);
+			}
+		bilen = bytes.length*8;
+	}
+	else	// stripped
+	{
+		var rps = img["t278"] ? img["t278"][0] : img.height;   rps = Math.min(rps, img.height);
+		for(var i=0; i<soff.length; i++)
+		{
+			UTIF.decode._decompress(img,ifds, data, soff[i], bcnt[i], cmpr, bytes, Math.ceil(bilen/8)|0, fo);
+			bilen += bipl * rps;
+		}
+		bilen = Math.min(bilen, bytes.length*8);
+	}
+	img.data = new Uint8Array(bytes.buffer, 0, Math.ceil(bilen/8)|0);
+}
+
+UTIF.decode._decompress = function(img,ifds, data, off, len, cmpr, tgt, toff, fo)  // fill order
+{
+	//console.log("compression", cmpr);
+	//var time = Date.now();
+	if(false) {}
+	else if(cmpr==1 || (len==tgt.length && cmpr!=32767)) for(var j=0; j<len; j++) tgt[toff+j] = data[off+j];
+	else if(cmpr==3) UTIF.decode._decodeG3 (data, off, len, tgt, toff, img.width, fo);
+	else if(cmpr==4) UTIF.decode._decodeG4 (data, off, len, tgt, toff, img.width, fo);
+	else if(cmpr==5) UTIF.decode._decodeLZW(data, off, tgt, toff);
+	else if(cmpr==6) UTIF.decode._decodeOldJPEG(img, data, off, len, tgt, toff);
+	else if(cmpr==7) UTIF.decode._decodeNewJPEG(img, data, off, len, tgt, toff);
+	else if(cmpr==8) {  var src = new Uint8Array(data.buffer,off,len);  var bin = pako["inflate"](src);  for(var i=0; i<bin.length; i++) tgt[toff+i]=bin[i];  }
+	else if(cmpr==32767) UTIF.decode._decodeARW(img, data, off, len, tgt, toff);
+	else if(cmpr==32773) UTIF.decode._decodePackBits(data, off, len, tgt, toff);
+	else if(cmpr==32809) UTIF.decode._decodeThunder (data, off, len, tgt, toff);
+	else if(cmpr==34713) //for(var j=0; j<len; j++) tgt[toff+j] = data[off+j];
+		UTIF.decode._decodeNikon   (img,ifds, data, off, len, tgt, toff);
+	else log("Unknown compression", cmpr);
+	
+	//console.log(Date.now()-time);
+	
+	var bps = (img["t258"]?Math.min(32,img["t258"][0]):1);
+	var noc = (img["t277"]?img["t277"][0]:1), bpp=(bps*noc)>>>3, h = (img["t278"] ? img["t278"][0] : img.height), bpl = Math.ceil(bps*noc*img.width/8);
+	
+	// convert to Little Endian  /*
+	if(bps==16 && !img.isLE && img["t33422"]==null)  // not DNG
+		for(var y=0; y<h; y++) {
+			//console.log("fixing endianity");
+			var roff = toff+y*bpl;
+			for(var x=1; x<bpl; x+=2) {  var t=tgt[roff+x];  tgt[roff+x]=tgt[roff+x-1];  tgt[roff+x-1]=t;  }
+		}  //*/
+
+	if(img["t317"] && img["t317"][0]==2)
+	{
+		for(var y=0; y<h; y++)
+		{
+			var ntoff = toff+y*bpl;
+			if(bps==16) for(var j=bpp; j<bpl; j+=2) {
+				var nv = ((tgt[ntoff+j+1]<<8)|tgt[ntoff+j])  +  ((tgt[ntoff+j-bpp+1]<<8)|tgt[ntoff+j-bpp]);
+				tgt[ntoff+j] = nv&255;  tgt[ntoff+j+1] = (nv>>>8)&255;  
+			}
+			else if(noc==3) for(var j=  3; j<bpl; j+=3)
+			{
+				tgt[ntoff+j  ] = (tgt[ntoff+j  ] + tgt[ntoff+j-3])&255;
+				tgt[ntoff+j+1] = (tgt[ntoff+j+1] + tgt[ntoff+j-2])&255;
+				tgt[ntoff+j+2] = (tgt[ntoff+j+2] + tgt[ntoff+j-1])&255;
+			}
+			else for(var j=bpp; j<bpl; j++) tgt[ntoff+j] = (tgt[ntoff+j] + tgt[ntoff+j-bpp])&255;
+		}
+	}
+}
+
+UTIF.decode._ljpeg_diff = function(data, prm, huff) {
+	var getbithuff   = UTIF.decode._getbithuff;
+	var len, diff;
+	len  = getbithuff(data, prm, huff[0], huff);
+	diff = getbithuff(data, prm, len, 0);
+	if ((diff & (1 << (len-1))) == 0)  diff -= (1 << len) - 1;
+	return diff;
+}
+UTIF.decode._decodeARW = function(img, inp, off, src_length, tgt, toff) {
+	var raw_width = img["t256"][0], height=img["t257"][0], tiff_bps=img["t258"][0];
+	var bin=(img.isLE ? UTIF._binLE : UTIF._binBE);
+	//console.log(raw_width, height, tiff_bps, raw_width*height, src_length);
+	var arw2 = (raw_width*height == src_length) || (raw_width*height*1.5 == src_length);
+	//arw2 = true;
+	//console.log("ARW2: ", arw2, raw_width*height, src_length, tgt.length);
+	if(!arw2) {  //"sony_arw_load_raw"; // not arw2
+		height+=8;
+		var prm = [off,0,0,0];
+		var huff = new Uint16Array(32770);
+		var tab = [ 0xf11,0xf10,0xe0f,0xd0e,0xc0d,0xb0c,0xa0b,0x90a,0x809,
+			0x708,0x607,0x506,0x405,0x304,0x303,0x300,0x202,0x201 ];
+		var i, c, n, col, row, sum=0;
+		var ljpeg_diff = UTIF.decode._ljpeg_diff;
+
+		huff[0] = 15;
+		for (n=i=0; i < 18; i++) {
+			var lim = 32768 >>> (tab[i] >>> 8);
+			for(var c=0; c<lim; c++) huff[++n] = tab[i];
+		}
+		for (col = raw_width; col--; )
+			for (row=0; row < height+1; row+=2) {
+				if (row == height) row = 1;
+				sum += ljpeg_diff(inp, prm, huff);
+				if (row < height) {
+					var clr =  (sum)&4095;
+					UTIF.decode._putsF(tgt, (row*raw_width+col)*tiff_bps, clr<<(16-tiff_bps));
+				}
+			}
+		return;
+	}
+	if(raw_width*height*1.5==src_length) {
+		//console.log("weird compression");
+		for(var i=0; i<src_length; i+=3) {  var b0=inp[off+i+0], b1=inp[off+i+1], b2=inp[off+i+2];  
+			tgt[toff+i]=(b1<<4)|(b0>>>4);  tgt[toff+i+1]=(b0<<4)|(b2>>>4);  tgt[toff+i+2]=(b2<<4)|(b1>>>4);  }
+		return;
+	}
+	
+	var pix = new Uint16Array(16);
+	var row, col, val, max, min, imax, imin, sh, bit, i,    dp;
+	
+	var data = new Uint8Array(raw_width+1);
+	for (row=0; row < height; row++) {
+		//fread (data, 1, raw_width, ifp);
+		for(var j=0; j<raw_width; j++) data[j]=inp[off++];
+		for (dp=0, col=0; col < raw_width-30; dp+=16) {
+			max  = 0x7ff & (val = bin.readUint(data,dp));
+			min  = 0x7ff & (val >>> 11);
+			imax = 0x0f & (val >>> 22);
+			imin = 0x0f & (val >>> 26);
+			for (sh=0; sh < 4 && 0x80 << sh <= max-min; sh++);
+			for (bit=30, i=0; i < 16; i++)
+				if      (i == imax) pix[i] = max;
+				else if (i == imin) pix[i] = min;
+				else {
+					pix[i] = ((bin.readUshort(data, dp+(bit >> 3)) >>> (bit & 7) & 0x7f) << sh) + min;
+					if (pix[i] > 0x7ff) pix[i] = 0x7ff;
+					bit += 7;
+				}
+			for (i=0; i < 16; i++, col+=2) {
+				//RAW(row,col) = curve[pix[i] << 1] >> 2;
+				var clr =  pix[i]<<1;   //clr = 0xffff;
+				UTIF.decode._putsF(tgt, (row*raw_width+col)*tiff_bps, clr<<(16-tiff_bps));
+			}
+			col -= col & 1 ? 1:31;
+		}
+	}
+}
+
+UTIF.decode._decodeNikon = function(img,imgs, data, off, src_length, tgt, toff)
+{
+	var nikon_tree = [
+    [ 0, 0,1,5,1,1,1,1,1,1,2,0,0,0,0,0,0,	/* 12-bit lossy */
+      5,4,3,6,2,7,1,0,8,9,11,10,12 ],
+    [ 0, 0,1,5,1,1,1,1,1,1,2,0,0,0,0,0,0,	/* 12-bit lossy after split */
+      0x39,0x5a,0x38,0x27,0x16,5,4,3,2,1,0,11,12,12 ],
+    [ 0, 0,1,4,2,3,1,2,0,0,0,0,0,0,0,0,0,  /* 12-bit lossless */
+      5,4,6,3,7,2,8,1,9,0,10,11,12 ],
+    [ 0, 0,1,4,3,1,1,1,1,1,2,0,0,0,0,0,0,	/* 14-bit lossy */
+      5,6,4,7,8,3,9,2,1,0,10,11,12,13,14 ],
+    [ 0, 0,1,5,1,1,1,1,1,1,1,2,0,0,0,0,0,	/* 14-bit lossy after split */
+      8,0x5c,0x4b,0x3a,0x29,7,6,5,4,3,2,1,0,13,14 ],
+    [ 0, 0,1,4,2,2,3,1,2,0,0,0,0,0,0,0,0,	/* 14-bit lossless */
+      7,6,8,5,9,4,10,3,11,12,2,0,1,13,14 ] ];
+	  
+	var raw_width = img["t256"][0], height=img["t257"][0], tiff_bps=img["t258"][0];
+	
+	var tree = 0, split = 0;
+	var make_decoder = UTIF.decode._make_decoder;
+	var getbithuff   = UTIF.decode._getbithuff;
+	
+	var mn = imgs[0].exifIFD.makerNote, md = mn["t150"]?mn["t150"]:mn["t140"], mdo=0;  //console.log(mn,md);
+	//console.log(md[0].toString(16), md[1].toString(16), tiff_bps);
+	var ver0 = md[mdo++], ver1 = md[mdo++];
+	if (ver0 == 0x49 || ver1 == 0x58)  mdo+=2110;
+	if (ver0 == 0x46) tree = 2;
+	if (tiff_bps == 14) tree += 3;
+	
+	var vpred = [[0,0],[0,0]], bin=(img.isLE ? UTIF._binLE : UTIF._binBE);
+	for(var i=0; i<2; i++) for(var j=0; j<2; j++) {  vpred[i][j] = bin.readShort(md,mdo);  mdo+=2;   }  // not sure here ... [i][j] or [j][i]
+	//console.log(vpred);
+	
+	
+	var max = 1 << tiff_bps & 0x7fff, step=0;
+	var csize = bin.readShort(md,mdo);  mdo+=2;
+	if (csize > 1) step = Math.floor(max / (csize-1));
+	if (ver0 == 0x44 && ver1 == 0x20 && step > 0)  split = bin.readShort(md,562);
+	
+	
+	var i;
+	var row, col;
+	var len, shl, diff;
+	var min_v = 0;
+	var hpred = [0,0];
+	var huff = make_decoder(nikon_tree[tree]);
+	
+	//var g_input_offset=0, bitbuf=0, vbits=0, reset=0;
+	var prm = [off,0,0,0];
+	//console.log(split);  split = 170;
+	
+	for (min_v=row=0; row < height; row++) {
+		if (split && row == split) {
+			//free (huff);
+			huff = make_decoder (nikon_tree[tree+1]);
+			//max_v += (min_v = 16) << 1;
+		}
+		for (col=0; col < raw_width; col++) {
+			i = getbithuff(data,prm,huff[0],huff);
+			len = i  & 15;
+			shl = i >>> 4;
+			diff = (((getbithuff(data,prm,len-shl,0) << 1) + 1) << shl) >>> 1;
+			if ((diff & (1 << (len-1))) == 0)
+				diff -= (1 << len) - (shl==0?1:0);
+			if (col < 2) hpred[col] = vpred[row & 1][col] += diff;
+			else         hpred[col & 1] += diff;
+			
+			var clr = Math.min(Math.max(hpred[col & 1],0),(1<<tiff_bps)-1);
+			var bti = (row*raw_width+col)*tiff_bps;  
+			UTIF.decode._putsF(tgt, bti, clr<<(16-tiff_bps));
+		}
+	}
+}
+// put 16 bits
+UTIF.decode._putsF= function(dt, pos, val) {  val = val<<(8-(pos&7));  var o=(pos>>>3);  dt[o]|=val>>>16;  dt[o+1]|=val>>>8;  dt[o+2]|=val;  }
+
+
+UTIF.decode._getbithuff = function(data,prm,nbits, huff) {
+	var zero_after_ff = 0;
+	var get_byte = UTIF.decode._get_byte;
+	var c;
+  
+	var off=prm[0], bitbuf=prm[1], vbits=prm[2], reset=prm[3];
+
+	//if (nbits > 25) return 0;
+	//if (nbits <  0) return bitbuf = vbits = reset = 0;
+	if (nbits == 0 || vbits < 0) return 0; 
+	while (!reset && vbits < nbits && (c = data[off++]) != -1 &&
+		!(reset = zero_after_ff && c == 0xff && data[off++])) {
+		//console.log("byte read into c");
+		bitbuf = (bitbuf << 8) + c;
+		vbits += 8;
+	} 
+	c = (bitbuf << (32-vbits)) >>> (32-nbits);
+	if (huff) {
+		vbits -= huff[c+1] >>> 8;  //console.log(c, huff[c]>>8);
+		c =  huff[c+1]&255;
+	} else
+		vbits -= nbits;
+	if (vbits < 0) throw "e";
+  
+	prm[0]=off;  prm[1]=bitbuf;  prm[2]=vbits;  prm[3]=reset;
+  
+	return c;
+}
+
+UTIF.decode._make_decoder = function(source) {
+	var max, len, h, i, j;
+	var huff = [];
+
+	for (max=16; max!=0 && !source[max]; max--);
+	var si=17;
+	
+	huff[0] = max;
+	for (h=len=1; len <= max; len++)
+		for (i=0; i < source[len]; i++, ++si)
+			for (j=0; j < 1 << (max-len); j++)
+				if (h <= 1 << max)
+					huff[h++] = (len << 8) | source[si];
+	return huff;
+}
+
+UTIF.decode._decodeNewJPEG = function(img, data, off, len, tgt, toff)
+{
+	var tables = img["t347"], tlen = tables ? tables.length : 0, buff = new Uint8Array(tlen + len);
+	
+	if (tables) {
+		var SOI = 216, EOI = 217, boff = 0;
+		for (var i=0; i<(tlen-1); i++)
+		{
+			// Skip EOI marker from JPEGTables
+			if (tables[i]==255 && tables[i+1]==EOI) break;
+			buff[boff++] = tables[i];
+		}
+
+		// Skip SOI marker from data
+		var byte1 = data[off], byte2 = data[off + 1];
+		if (byte1!=255 || byte2!=SOI)
+		{
+			buff[boff++] = byte1;
+			buff[boff++] = byte2;
+		}
+		for (var i=2; i<len; i++) buff[boff++] = data[off+i];
+	}
+	else for (var i=0; i<len; i++) buff[i] = data[off+i];
+
+	if(img["t262"][0]==32803 || img["t262"][0]==34892) // lossless JPEG and lossy JPEG (used in DNG files)
+	{
+		var bps = img["t258"][0];//, dcdr = new LosslessJpegDecoder();
+		var out = UTIF.LosslessJpegDecode(buff), olen=out.length;  //console.log(olen);
+		
+		if(false) {}
+		else if(bps==16) {
+			if(img.isLE) for(var i=0; i<olen; i++ ) {  tgt[toff+(i<<1)] = (out[i]&255);  tgt[toff+(i<<1)+1] = (out[i]>>>8);  }
+			else         for(var i=0; i<olen; i++ ) {  tgt[toff+(i<<1)] = (out[i]>>>8);  tgt[toff+(i<<1)+1] = (out[i]&255);  }
+		}
+		else if(bps==14 || bps==12) {  // 4 * 14 == 56 == 7 * 8
+			var rst = 16-bps;
+			for(var i=0; i<olen; i++) UTIF.decode._putsF(tgt, i*bps, out[i]<<rst);
+		}
+		else throw new Error("unsupported bit depth "+bps);
+	}
+	else
+	{
+		var parser = new UTIF.JpegDecoder();  parser.parse(buff);
+		var decoded = parser.getData(parser.width, parser.height);
+		for (var i=0; i<decoded.length; i++) tgt[toff + i] = decoded[i];
+	}
+
+	// PhotometricInterpretation is 6 (YCbCr) for JPEG, but after decoding we populate data in
+	// RGB format, so updating the tag value
+	if(img["t262"][0] == 6)  img["t262"][0] = 2;
+}
+
+UTIF.decode._decodeOldJPEGInit = function(img, data, off, len)
+{
+	var SOI = 216, EOI = 217, DQT = 219, DHT = 196, DRI = 221, SOF0 = 192, SOS = 218;
+	var joff = 0, soff = 0, tables, sosMarker, isTiled = false, i, j, k;
+	var jpgIchgFmt    = img["t513"], jifoff = jpgIchgFmt ? jpgIchgFmt[0] : 0;
+	var jpgIchgFmtLen = img["t514"], jiflen = jpgIchgFmtLen ? jpgIchgFmtLen[0] : 0;
+	var soffTag       = img["t324"] || img["t273"] || jpgIchgFmt;
+	var ycbcrss       = img["t530"], ssx = 0, ssy = 0;
+	var spp           = img["t277"]?img["t277"][0]:1;
+	var jpgresint     = img["t515"];
+
+	if(soffTag)
+	{
+		soff = soffTag[0];
+		isTiled = (soffTag.length > 1);
+	}
+
+	if(!isTiled)
+	{
+		if(data[off]==255 && data[off+1]==SOI) return { jpegOffset: off };
+		if(jpgIchgFmt!=null)
+		{
+			if(data[off+jifoff]==255 && data[off+jifoff+1]==SOI) joff = off+jifoff;
+			else log("JPEGInterchangeFormat does not point to SOI");
+
+			if(jpgIchgFmtLen==null) log("JPEGInterchangeFormatLength field is missing");
+			else if(jifoff >= soff || (jifoff+jiflen) <= soff) log("JPEGInterchangeFormatLength field value is invalid");
+
+			if(joff != null) return { jpegOffset: joff };
+		}
+	}
+
+	if(ycbcrss!=null) {  ssx = ycbcrss[0];  ssy = ycbcrss[1];  }
+
+	if(jpgIchgFmt!=null)
+		if(jpgIchgFmtLen!=null)
+			if(jiflen >= 2 && (jifoff+jiflen) <= soff)
+			{
+				if(data[off+jifoff+jiflen-2]==255 && data[off+jifoff+jiflen-1]==SOI) tables = new Uint8Array(jiflen-2);
+				else tables = new Uint8Array(jiflen);
+
+				for(i=0; i<tables.length; i++) tables[i] = data[off+jifoff+i];
+				log("Incorrect JPEG interchange format: using JPEGInterchangeFormat offset to derive tables");
+			}
+			else log("JPEGInterchangeFormat+JPEGInterchangeFormatLength > offset to first strip or tile");
+
+	if(tables == null)
+	{
+		var ooff = 0, out = [];
+		out[ooff++] = 255; out[ooff++] = SOI;
+
+		var qtables = img["t519"];
+		if(qtables==null) throw new Error("JPEGQTables tag is missing");
+		for(i=0; i<qtables.length; i++)
+		{
+			out[ooff++] = 255; out[ooff++] = DQT; out[ooff++] = 0; out[ooff++] = 67; out[ooff++] = i;
+			for(j=0; j<64; j++) out[ooff++] = data[off+qtables[i]+j];
+		}
+
+		for(k=0; k<2; k++)
+		{
+			var htables = img[(k == 0) ? "t520" : "t521"];
+			if(htables==null) throw new Error(((k == 0) ? "JPEGDCTables" : "JPEGACTables") + " tag is missing");
+			for(i=0; i<htables.length; i++)
+			{
+				out[ooff++] = 255; out[ooff++] = DHT;
+				//out[ooff++] = 0; out[ooff++] = 67; out[ooff++] = i;
+				var nc = 19;
+				for(j=0; j<16; j++) nc += data[off+htables[i]+j];
+
+				out[ooff++] = (nc >>> 8); out[ooff++] = nc & 255;
+				out[ooff++] = (i | (k << 4));
+				for(j=0; j<16; j++) out[ooff++] = data[off+htables[i]+j];
+				for(j=0; j<nc; j++) out[ooff++] = data[off+htables[i]+16+j];
+			}
+		}
+
+		out[ooff++] = 255; out[ooff++] = SOF0;
+		out[ooff++] = 0;  out[ooff++] = 8 + 3*spp;  out[ooff++] = 8;
+		out[ooff++] = (img.height >>> 8) & 255;  out[ooff++] = img.height & 255;
+		out[ooff++] = (img.width  >>> 8) & 255;  out[ooff++] = img.width  & 255;
+		out[ooff++] = spp;
+		if(spp==1) {  out[ooff++] = 1;  out[ooff++] = 17;  out[ooff++] = 0;  }
+		else for(i=0; i<3; i++)
+		{
+			out[ooff++] = i + 1;
+			out[ooff++] = (i != 0) ? 17 : (((ssx & 15) << 4) | (ssy & 15));
+			out[ooff++] = i;
+		}
+
+		if(jpgresint!=null && jpgresint[0]!=0)
+		{
+			out[ooff++] = 255;  out[ooff++] = DRI;  out[ooff++] = 0;  out[ooff++] = 4;
+			out[ooff++] = (jpgresint[0] >>> 8) & 255;
+			out[ooff++] = jpgresint[0] & 255;
+		}
+
+		tables = new Uint8Array(out);
+	}
+
+	var sofpos = -1;
+	i = 0;
+	while(i < (tables.length - 1)) {
+		if(tables[i]==255 && tables[i+1]==SOF0) {  sofpos = i; break;  }
+		i++;
+	}
+
+	if(sofpos == -1)
+	{
+		var tmptab = new Uint8Array(tables.length + 10 + 3*spp);
+		tmptab.set(tables);
+		var tmpoff = tables.length;
+		sofpos = tables.length;
+		tables = tmptab;
+
+		tables[tmpoff++] = 255; tables[tmpoff++] = SOF0;
+		tables[tmpoff++] = 0;  tables[tmpoff++] = 8 + 3*spp;  tables[tmpoff++] = 8;
+		tables[tmpoff++] = (img.height >>> 8) & 255;  tables[tmpoff++] = img.height & 255;
+		tables[tmpoff++] = (img.width  >>> 8) & 255;  tables[tmpoff++] = img.width  & 255;
+		tables[tmpoff++] = spp;
+		if(spp==1) {  tables[tmpoff++] = 1;  tables[tmpoff++] = 17;  tables[tmpoff++] = 0;  }
+		else for(i=0; i<3; i++)
+		{
+			tables[tmpoff++] = i + 1;
+			tables[tmpoff++] = (i != 0) ? 17 : (((ssx & 15) << 4) | (ssy & 15));
+			tables[tmpoff++] = i;
+		}
+	}
+
+	if(data[soff]==255 && data[soff+1]==SOS)
+	{
+		var soslen = (data[soff+2]<<8) | data[soff+3];
+		sosMarker = new Uint8Array(soslen+2);
+		sosMarker[0] = data[soff];  sosMarker[1] = data[soff+1]; sosMarker[2] = data[soff+2];  sosMarker[3] = data[soff+3];
+		for(i=0; i<(soslen-2); i++) sosMarker[i+4] = data[soff+i+4];
+	}
+	else
+	{
+		sosMarker = new Uint8Array(2 + 6 + 2*spp);
+		var sosoff = 0;
+		sosMarker[sosoff++] = 255;  sosMarker[sosoff++] = SOS;
+		sosMarker[sosoff++] = 0;  sosMarker[sosoff++] = 6 + 2*spp;  sosMarker[sosoff++] = spp;
+		if(spp==1) {  sosMarker[sosoff++] = 1;  sosMarker[sosoff++] = 0;  }
+		else for(i=0; i<3; i++)
+		{
+			sosMarker[sosoff++] = i+1;  sosMarker[sosoff++] = (i << 4) | i;
+		}
+		sosMarker[sosoff++] = 0;  sosMarker[sosoff++] = 63;  sosMarker[sosoff++] = 0;
+	}
+
+	return { jpegOffset: off, tables: tables, sosMarker: sosMarker, sofPosition: sofpos };
+}
+
+UTIF.decode._decodeOldJPEG = function(img, data, off, len, tgt, toff)
+{
+	var i, dlen, tlen, buff, buffoff;
+	var jpegData = UTIF.decode._decodeOldJPEGInit(img, data, off, len);
+
+	if(jpegData.jpegOffset!=null)
+	{
+		dlen = off+len-jpegData.jpegOffset;
+		buff = new Uint8Array(dlen);
+		for(i=0; i<dlen; i++) buff[i] = data[jpegData.jpegOffset+i];
+	}
+	else
+	{
+		tlen = jpegData.tables.length;
+		buff = new Uint8Array(tlen + jpegData.sosMarker.length + len + 2);
+		buff.set(jpegData.tables);
+		buffoff = tlen;
+
+		buff[jpegData.sofPosition+5] = (img.height >>> 8) & 255;  buff[jpegData.sofPosition+6] = img.height & 255;
+		buff[jpegData.sofPosition+7] = (img.width  >>> 8) & 255;  buff[jpegData.sofPosition+8] = img.width  & 255;
+
+		if(data[off]!=255 || data[off+1]!=SOS)
+		{
+			buff.set(jpegData.sosMarker, buffoff);
+			buffoff += sosMarker.length;
+		}
+		for(i=0; i<len; i++) buff[buffoff++] = data[off+i];
+		buff[buffoff++] = 255;  buff[buffoff++] = EOI;
+	}
+
+	var parser = new UTIF.JpegDecoder();  parser.parse(buff);
+	var decoded = parser.getData(parser.width, parser.height);
+	for (var i=0; i<decoded.length; i++) tgt[toff + i] = decoded[i];
+
+	// PhotometricInterpretation is 6 (YCbCr) for JPEG, but after decoding we populate data in
+	// RGB format, so updating the tag value
+	if(img["t262"] && img["t262"][0] == 6)  img["t262"][0] = 2;
+}
+
+UTIF.decode._decodePackBits = function(data, off, len, tgt, toff)
+{
+	var sa = new Int8Array(data.buffer), ta = new Int8Array(tgt.buffer), lim = off+len;
+	while(off<lim)
+	{
+		var n = sa[off];  off++;
+		if(n>=0  && n<128)    for(var i=0; i< n+1; i++) {  ta[toff]=sa[off];  toff++;  off++;   }
+		if(n>=-127 && n<0) {  for(var i=0; i<-n+1; i++) {  ta[toff]=sa[off];  toff++;           }  off++;  }
+	}
+}
+
+UTIF.decode._decodeThunder = function(data, off, len, tgt, toff)
+{
+	var d2 = [ 0, 1, 0, -1 ],  d3 = [ 0, 1, 2, 3, 0, -3, -2, -1 ];
+	var lim = off+len, qoff = toff*2, px = 0;
+	while(off<lim)
+	{
+		var b = data[off], msk = (b>>>6), n = (b&63);  off++;
+		if(msk==3) { px=(n&15);  tgt[qoff>>>1] |= (px<<(4*(1-qoff&1)));  qoff++;   }
+		if(msk==0) for(var i=0; i<n; i++) {  tgt[qoff>>>1] |= (px<<(4*(1-qoff&1)));  qoff++;   }
+		if(msk==2) for(var i=0; i<2; i++) {  var d=(n>>>(3*(1-i)))&7;  if(d!=4) { px+=d3[d];  tgt[qoff>>>1] |= (px<<(4*(1-qoff&1)));  qoff++; }  }
+		if(msk==1) for(var i=0; i<3; i++) {  var d=(n>>>(2*(2-i)))&3;  if(d!=2) { px+=d2[d];  tgt[qoff>>>1] |= (px<<(4*(1-qoff&1)));  qoff++; }  }
+	}
+}
+
+UTIF.decode._dmap = { "1":0,"011":1,"000011":2,"0000011":3, "010":-1,"000010":-2,"0000010":-3  };
+UTIF.decode._lens = ( function()
+{
+	var addKeys = function(lens, arr, i0, inc) {  for(var i=0; i<arr.length; i++) lens[arr[i]] = i0 + i*inc;  }
+
+	var termW = "00110101,000111,0111,1000,1011,1100,1110,1111,10011,10100,00111,01000,001000,000011,110100,110101," // 15
+	+ "101010,101011,0100111,0001100,0001000,0010111,0000011,0000100,0101000,0101011,0010011,0100100,0011000,00000010,00000011,00011010," // 31
+	+ "00011011,00010010,00010011,00010100,00010101,00010110,00010111,00101000,00101001,00101010,00101011,00101100,00101101,00000100,00000101,00001010," // 47
+	+ "00001011,01010010,01010011,01010100,01010101,00100100,00100101,01011000,01011001,01011010,01011011,01001010,01001011,00110010,00110011,00110100";
+
+	var termB = "0000110111,010,11,10,011,0011,0010,00011,000101,000100,0000100,0000101,0000111,00000100,00000111,000011000," // 15
+	+ "0000010111,0000011000,0000001000,00001100111,00001101000,00001101100,00000110111,00000101000,00000010111,00000011000,000011001010,000011001011,000011001100,000011001101,000001101000,000001101001," // 31
+	+ "000001101010,000001101011,000011010010,000011010011,000011010100,000011010101,000011010110,000011010111,000001101100,000001101101,000011011010,000011011011,000001010100,000001010101,000001010110,000001010111," // 47
+	+ "000001100100,000001100101,000001010010,000001010011,000000100100,000000110111,000000111000,000000100111,000000101000,000001011000,000001011001,000000101011,000000101100,000001011010,000001100110,000001100111";
+
+	var makeW = "11011,10010,010111,0110111,00110110,00110111,01100100,01100101,01101000,01100111,011001100,011001101,011010010,011010011,011010100,011010101,011010110,"
+	+ "011010111,011011000,011011001,011011010,011011011,010011000,010011001,010011010,011000,010011011";
+
+	var makeB = "0000001111,000011001000,000011001001,000001011011,000000110011,000000110100,000000110101,0000001101100,0000001101101,0000001001010,0000001001011,0000001001100,"
+	+ "0000001001101,0000001110010,0000001110011,0000001110100,0000001110101,0000001110110,0000001110111,0000001010010,0000001010011,0000001010100,0000001010101,0000001011010,"
+	+ "0000001011011,0000001100100,0000001100101";
+
+	var makeA = "00000001000,00000001100,00000001101,000000010010,000000010011,000000010100,000000010101,000000010110,000000010111,000000011100,000000011101,000000011110,000000011111";
+
+	termW = termW.split(",");  termB = termB.split(",");  makeW = makeW.split(",");  makeB = makeB.split(",");  makeA = makeA.split(",");
+
+	var lensW = {}, lensB = {};
+	addKeys(lensW, termW, 0, 1);  addKeys(lensW, makeW, 64,64);  addKeys(lensW, makeA, 1792,64);
+	addKeys(lensB, termB, 0, 1);  addKeys(lensB, makeB, 64,64);  addKeys(lensB, makeA, 1792,64);
+	return [lensW, lensB];
+} )();
+
+UTIF.decode._decodeG4 = function(data, off, slen, tgt, toff, w, fo)
+{
+	var U = UTIF.decode, boff=off<<3, len=0, wrd="";	// previous starts with 1
+	var line=[], pline=[];  for(var i=0; i<w; i++) pline.push(0);  pline=U._makeDiff(pline);
+	var a0=0, a1=0, a2=0, b1=0, b2=0, clr=0;
+	var y=0, mode="", toRead=0;
+	var bipl = Math.ceil(w/8)*8;
+
+	while((boff>>>3)<off+slen)
+	{
+		b1 = U._findDiff(pline, a0+(a0==0?0:1), 1-clr), b2 = U._findDiff(pline, b1, clr);	// could be precomputed
+		var bit =0;
+		if(fo==1) bit = (data[boff>>>3]>>>(7-(boff&7)))&1;
+		if(fo==2) bit = (data[boff>>>3]>>>(  (boff&7)))&1;
+		boff++;  wrd+=bit;
+		if(mode=="H")
+		{
+			if(U._lens[clr][wrd]!=null)
+			{
+				var dl=U._lens[clr][wrd];  wrd="";  len+=dl;
+				if(dl<64) {  U._addNtimes(line,len,clr);  a0+=len;  clr=1-clr;  len=0;  toRead--;  if(toRead==0) mode="";  }
+			}
+		}
+		else
+		{
+			if(wrd=="0001")  {  wrd="";  U._addNtimes(line,b2-a0,clr);  a0=b2;   }
+			if(wrd=="001" )  {  wrd="";  mode="H";  toRead=2;  }
+			if(U._dmap[wrd]!=null) {  a1 = b1+U._dmap[wrd];  U._addNtimes(line, a1-a0, clr);  a0=a1;  wrd="";  clr=1-clr;  }
+		}
+		if(line.length==w && mode=="")
+		{
+			U._writeBits(line, tgt, toff*8+y*bipl);
+			clr=0;  y++;  a0=0;
+			pline=U._makeDiff(line);  line=[];
+		}
+		//if(wrd.length>150) {  log(wrd);  break;  throw "e";  }
+	}
+}
+
+UTIF.decode._findDiff = function(line, x, clr) {  for(var i=0; i<line.length; i+=2) if(line[i]>=x && line[i+1]==clr)  return line[i];  }
+
+UTIF.decode._makeDiff = function(line)
+{
+	var out = [];  if(line[0]==1) out.push(0,1);
+	for(var i=1; i<line.length; i++) if(line[i-1]!=line[i]) out.push(i, line[i]);
+	out.push(line.length,0,line.length,1);  return out;
+}
+
+UTIF.decode._decodeG3 = function(data, off, slen, tgt, toff, w, fo)
+{
+	var U = UTIF.decode, boff=off<<3, len=0, wrd="";
+	var line=[], pline=[];  for(var i=0; i<w; i++) line.push(0);
+	var a0=0, a1=0, a2=0, b1=0, b2=0, clr=0;
+	var y=-1, mode="", toRead=0, is1D=false;
+	var bipl = Math.ceil(w/8)*8;
+	while((boff>>>3)<off+slen)
+	{
+		b1 = U._findDiff(pline, a0+(a0==0?0:1), 1-clr), b2 = U._findDiff(pline, b1, clr);	// could be precomputed
+		var bit =0;
+		if(fo==1) bit = (data[boff>>>3]>>>(7-(boff&7)))&1;
+		if(fo==2) bit = (data[boff>>>3]>>>(  (boff&7)))&1;
+		boff++;  wrd+=bit;
+
+		if(is1D)
+		{
+			if(U._lens[clr][wrd]!=null)
+			{
+				var dl=U._lens[clr][wrd];  wrd="";  len+=dl;
+				if(dl<64) {  U._addNtimes(line,len,clr);  clr=1-clr;  len=0;  }
+			}
+		}
+		else
+		{
+			if(mode=="H")
+			{
+				if(U._lens[clr][wrd]!=null)
+				{
+					var dl=U._lens[clr][wrd];  wrd="";  len+=dl;
+					if(dl<64) {  U._addNtimes(line,len,clr);  a0+=len;  clr=1-clr;  len=0;  toRead--;  if(toRead==0) mode="";  }
+				}
+			}
+			else
+			{
+				if(wrd=="0001")  {  wrd="";  U._addNtimes(line,b2-a0,clr);  a0=b2;   }
+				if(wrd=="001" )  {  wrd="";  mode="H";  toRead=2;  }
+				if(U._dmap[wrd]!=null) {  a1 = b1+U._dmap[wrd];  U._addNtimes(line, a1-a0, clr);  a0=a1;  wrd="";  clr=1-clr;  }
+			}
+		}
+		if(wrd.endsWith("000000000001")) // needed for some files
+		{
+			if(y>=0) U._writeBits(line, tgt, toff*8+y*bipl);
+			if(fo==1) is1D = ((data[boff>>>3]>>>(7-(boff&7)))&1)==1;
+			if(fo==2) is1D = ((data[boff>>>3]>>>(  (boff&7)))&1)==1;
+			boff++;
+			if(U._decodeG3.allow2D==null) U._decodeG3.allow2D=is1D;
+			if(!U._decodeG3.allow2D) {  is1D = true;  boff--;  }
+			//log("EOL",y, "next 1D:", is1D);
+			wrd="";  clr=0;  y++;  a0=0;
+			pline=U._makeDiff(line);  line=[];
+		}
+	}
+	if(line.length==w) U._writeBits(line, tgt, toff*8+y*bipl);
+}
+
+UTIF.decode._addNtimes = function(arr, n, val) {  for(var i=0; i<n; i++) arr.push(val);  }
+
+UTIF.decode._writeBits = function(bits, tgt, boff)
+{
+	for(var i=0; i<bits.length; i++) tgt[(boff+i)>>>3] |= (bits[i]<<(7-((boff+i)&7)));
+}
+
+UTIF.decode._decodeLZW = function(data, off, tgt, toff)
+{
+	if(UTIF.decode._lzwTab==null)
+	{
+		var tb=new Uint32Array(0xffff), tn=new Uint16Array(0xffff), chr=new Uint8Array(2e6);
+		for(var i=0; i<256; i++) { chr[i<<2]=i;  tb[i]=i<<2;  tn[i]=1;  }
+		UTIF.decode._lzwTab = [tb,tn,chr];
+	}
+	var copy = UTIF.decode._copyData;
+	var tab = UTIF.decode._lzwTab[0], tln=UTIF.decode._lzwTab[1], chr=UTIF.decode._lzwTab[2], totl = 258, chrl = 258<<2;
+	var bits = 9, boff = off<<3;  // offset in bits
+
+	var ClearCode = 256, EoiCode = 257;
+	var v = 0, Code = 0, OldCode = 0;
+	while(true)
+	{
+		v = (data[boff>>>3]<<16) | (data[(boff+8)>>>3]<<8) | data[(boff+16)>>>3];
+		Code = ( v>>(24-(boff&7)-bits) )    &   ((1<<bits)-1);  boff+=bits;
+
+		if(Code==EoiCode) break;
+		if(Code==ClearCode)
+		{
+			bits=9;  totl = 258;  chrl = 258<<2;
+
+			v = (data[boff>>>3]<<16) | (data[(boff+8)>>>3]<<8) | data[(boff+16)>>>3];
+			Code = ( v>>(24-(boff&7)-bits) )    &   ((1<<bits)-1);  boff+=bits;
+			if(Code==EoiCode) break;
+			tgt[toff]=Code;  toff++;
+		}
+		else if(Code<totl)
+		{
+			var cd = tab[Code], cl = tln[Code];
+			copy(chr,cd,tgt,toff,cl);  toff += cl;
+
+			if(OldCode>=totl) {  tab[totl] = chrl;  chr[tab[totl]] = cd[0];  tln[totl]=1;  chrl=(chrl+1+3)&~0x03;  totl++;  }
+			else
+			{
+				tab[totl] = chrl;
+				var nit = tab[OldCode], nil = tln[OldCode];
+				copy(chr,nit,chr,chrl,nil);
+				chr[chrl+nil]=chr[cd];  nil++;
+				tln[totl]=nil;  totl++;
+
+				chrl=(chrl+nil+3)&~0x03;
+			}
+			if(totl+1==(1<<bits)) bits++;
+		}
+		else
+		{
+			if(OldCode>=totl) {  tab[totl] = chrl;  tln[totl]=0;  totl++;  }
+			else
+			{
+				tab[totl] = chrl;
+				var nit = tab[OldCode], nil = tln[OldCode];
+				copy(chr,nit,chr,chrl,nil);
+				chr[chrl+nil]=chr[chrl];  nil++;
+				tln[totl]=nil;  totl++;
+
+				copy(chr,chrl,tgt,toff,nil);  toff += nil;
+				chrl=(chrl+nil+3)&~0x03;
+			}
+			if(totl+1==(1<<bits)) bits++;
+		}
+		OldCode = Code;
+	}
+}
+
+UTIF.decode._copyData = function(s,so,t,to,l) {  for(var i=0;i<l;i+=4) {  t[to+i]=s[so+i];  t[to+i+1]=s[so+i+1];  t[to+i+2]=s[so+i+2];  t[to+i+3]=s[so+i+3];  }  }
+
+UTIF.tags = {};
+UTIF.ttypes = {  256:3,257:3,258:3,   259:3, 262:3,  273:4,  274:3, 277:3,278:4,279:4, 282:5, 283:5, 284:3, 286:5,287:5, 296:3, 305:2, 306:2, 338:3, 513:4, 514:4, 34665:4  };
+
+UTIF._readIFD = function(bin, data, offset, ifds, depth, debug)
+{
+	var cnt = bin.readUshort(data, offset);  offset+=2;
+	var ifd = {};  ifds.push(ifd);
+
+	if(debug) log("   ".repeat(depth),ifds.length-1,">>>----------------");
+	for(var i=0; i<cnt; i++)
+	{
+		var tag  = bin.readUshort(data, offset);    offset+=2;
+		var type = bin.readUshort(data, offset);    offset+=2;
+		var num  = bin.readUint  (data, offset);    offset+=4;
+		var voff = bin.readUint  (data, offset);    offset+=4;
+		//if(tag==33723) {type=1; num*=4;}//console.log(type,num,voff);//type = 1;  // IPTC/NAA
+
+		var arr = [];
+		//ifd["t"+tag+"-"+UTIF.tags[tag]] = arr;
+		if(type== 1 || type==7) {  arr = new Uint8Array(data.buffer, (num<5 ? offset-4 : voff), num);  }
+		if(type== 2) {  var o0 = (num<5 ? offset-4 : voff), c=data[o0];  
+						if(c<128) arr.push( bin.readASCII(data, o0, num-1) );
+						else      arr = new Uint8Array(data.buffer, o0, num-1);  }
+		if(type== 3) {  for(var j=0; j<num; j++) arr.push(bin.readUshort(data, (num<3 ? offset-4 : voff)+2*j));  }
+		if(type== 4) {  for(var j=0; j<num; j++) arr.push(bin.readUint  (data, (num<2 ? offset-4 : voff)+4*j));  }
+		if(type== 5) {  for(var j=0; j<num; j++) arr.push(bin.readUint  (data, voff+j*8) / bin.readUint(data,voff+j*8+4));  }
+		if(type== 8) {  for(var j=0; j<num; j++) arr.push(bin.readShort (data, (num<3 ? offset-4 : voff)+2*j));  }
+		if(type== 9) {  for(var j=0; j<num; j++) arr.push(bin.readInt   (data, (num<2 ? offset-4 : voff)+4*j));  }
+		if(type==10) {  for(var j=0; j<num; j++) arr.push(bin.readInt   (data, voff+j*8) / bin.readInt (data,voff+j*8+4));  }
+		if(type==11) {  for(var j=0; j<num; j++) arr.push(bin.readFloat (data, voff+j*4));  }
+		if(type==12) {  for(var j=0; j<num; j++) arr.push(bin.readDouble(data, voff+j*8));  }
+		
+		ifd["t"+tag] = arr;
+		
+		if(num!=0 && arr.length==0) {  log("unknown TIFF tag type: ", type, "num:",num);  }
+		if(debug) log("   ".repeat(depth), tag, type, UTIF.tags[tag], arr);
+		
+		if(tag==330 && ifd["t272"] && ifd["t272"][0]=="DSLR-A100") {  } 
+		// ifd["t258"]=[12];  ifd["t259"]=[32767];  ifd["t273"]=[offset+arr[0]];  ifd["t277"]=[1];  ifd["t279"]=[1];  ifd["t33421"]=[2,2];  ifd["t33422"]=[0,1,1,2];
+		else if(tag==330 || tag==34665 || (tag==50740 && bin.readUshort(data,bin.readUint(arr,0))<300  )) {
+			var oarr = tag==50740 ? [bin.readUint(arr,0)] : arr;
+			var subfd = [];
+			for(var j=0; j<oarr.length; j++) UTIF._readIFD(bin, data, oarr[j], subfd, depth+1, debug);
+			if(tag==  330) ifd.subIFD = subfd;
+			if(tag==34665) ifd.exifIFD = subfd[0];
+			if(tag==50740) ifd.dngPrvt = subfd[0];
+		}
+		if(tag==37500) {
+			var mn = arr;
+			//console.log(bin.readASCII(mn,0,mn.length), mn);
+			if(bin.readASCII(mn,0,5)=="Nikon")  ifd.makerNote = UTIF["decode"](mn.slice(10).buffer)[0];
+			else if(bin.readUshort(data,voff)<300){
+				var subsub=[];  UTIF._readIFD(bin, data, voff, subsub, depth+1, debug);
+				ifd.makerNote = subsub[0];
+			}
+		}
+	}
+	if(debug) log("   ".repeat(depth),"<<<---------------");
+	return offset;
+}
+
+UTIF._writeIFD = function(bin, data, offset, ifd)
+{
+	var keys = Object.keys(ifd);
+	bin.writeUshort(data, offset, keys.length);  offset+=2;
+
+	var eoff = offset + keys.length*12 + 4;
+
+	for(var ki=0; ki<keys.length; ki++)
+	{
+		var key = keys[ki];
+		var tag = parseInt(key.slice(1)), type = UTIF.ttypes[tag];  if(type==null) throw new Error("unknown type of tag: "+tag);
+		var val = ifd[key];  if(type==2) val=val[0]+"\u0000";  var num = val.length;
+		bin.writeUshort(data, offset, tag );  offset+=2;
+		bin.writeUshort(data, offset, type);  offset+=2;
+		bin.writeUint  (data, offset, num );  offset+=4;
+
+		var dlen = [-1, 1, 1, 2, 4, 8, 0, 0, 0, 0, 0, 0, 8][type] * num;
+		var toff = offset;
+		if(dlen>4) {  bin.writeUint(data, offset, eoff);  toff=eoff;  }
+
+		if(type==2) {  bin.writeASCII(data, toff, val);   }
+		if(type==3) {  for(var i=0; i<num; i++) bin.writeUshort(data, toff+2*i, val[i]);    }
+		if(type==4) {  for(var i=0; i<num; i++) bin.writeUint  (data, toff+4*i, val[i]);    }
+		if(type==5) {  for(var i=0; i<num; i++) {  bin.writeUint(data, toff+8*i, Math.round(val[i]*10000));  bin.writeUint(data, toff+8*i+4, 10000);  }   }
+		if (type == 12) {  for (var i = 0; i < num; i++) bin.writeDouble(data, toff + 8 * i, val[i]); }
+
+		if(dlen>4) {  dlen += (dlen&1);  eoff += dlen;  }
+		offset += 4;
+	}
+	return [offset, eoff];
+}
+
+UTIF.toRGBA8 = function(out)
+{
+	var w = out.width, h = out.height, area = w*h, qarea = area*4, data = out.data;
+	var img = new Uint8Array(area*4);
+	//console.log(out);
+	// 0: WhiteIsZero, 1: BlackIsZero, 2: RGB, 3: Palette color, 4: Transparency mask, 5: CMYK
+	var intp = (out["t262"] ? out["t262"][0]: 2), bps = (out["t258"]?Math.min(32,out["t258"][0]):1);
+	//log("interpretation: ", intp, "bps", bps, out);
+	if(false) {}
+	else if(intp==0)
+	{
+		var bpl = Math.ceil(bps*w/8);
+		for(var y=0; y<h; y++) {
+			var off = y*bpl, io = y*w;
+			if(bps== 1) for(var i=0; i<w; i++) {  var qi=(io+i)<<2, px=((data[off+(i>>3)])>>(7-  (i&7)))& 1;  img[qi]=img[qi+1]=img[qi+2]=( 1-px)*255;  img[qi+3]=255;    }
+			if(bps== 4) for(var i=0; i<w; i++) {  var qi=(io+i)<<2, px=((data[off+(i>>1)])>>(4-4*(i&1)))&15;  img[qi]=img[qi+1]=img[qi+2]=(15-px)* 17;  img[qi+3]=255;    }
+			if(bps== 8) for(var i=0; i<w; i++) {  var qi=(io+i)<<2, px=data[off+i];  img[qi]=img[qi+1]=img[qi+2]=255-px;  img[qi+3]=255;    }
+		}
+	}
+	else if(intp==1)
+	{
+		var bpl = Math.ceil(bps*w/8);
+		for(var y=0; y<h; y++) {
+			var off = y*bpl, io = y*w;
+			if(bps== 1) for(var i=0; i<w; i++) {  var qi=(io+i)<<2, px=((data[off+(i>>3)])>>(7-  (i&7)))&1;   img[qi]=img[qi+1]=img[qi+2]=(px)*255;  img[qi+3]=255;    }
+			if(bps== 2) for(var i=0; i<w; i++) {  var qi=(io+i)<<2, px=((data[off+(i>>2)])>>(6-2*(i&3)))&3;   img[qi]=img[qi+1]=img[qi+2]=(px)* 85;  img[qi+3]=255;    }
+			if(bps== 8) for(var i=0; i<w; i++) {  var qi=(io+i)<<2, px=data[off+i];  img[qi]=img[qi+1]=img[qi+2]=    px;  img[qi+3]=255;    }
+			if(bps==16) for(var i=0; i<w; i++) {  var qi=(io+i)<<2, px=data[off+(2*i+1)];  img[qi]=img[qi+1]=img[qi+2]= Math.min(255,px);  img[qi+3]=255;    } // ladoga.tif
+		}
+	}
+	else if(intp==2)
+	{
+		var smpls = out["t258"]?out["t258"].length : 3;
+		
+		if(bps== 8) 
+		{
+			if(smpls==4) for(var i=0; i<qarea; i++) img[i] = data[i];
+			if(smpls==3) for(var i=0; i< area; i++) {  var qi=i<<2, ti=i*3;  img[qi]=data[ti];  img[qi+1]=data[ti+1];  img[qi+2]=data[ti+2];  img[qi+3]=255;    }
+		}
+		else{  // 3x 16-bit channel
+			if(smpls==4) for(var i=0; i<area; i++) {  var qi=i<<2, ti=i*8+1;  img[qi]=data[ti];  img[qi+1]=data[ti+2];  img[qi+2]=data[ti+4];  img[qi+3]=data[ti+6];    }
+			if(smpls==3) for(var i=0; i<area; i++) {  var qi=i<<2, ti=i*6+1;  img[qi]=data[ti];  img[qi+1]=data[ti+2];  img[qi+2]=data[ti+4];  img[qi+3]=255;           }
+		}
+	}
+	else if(intp==3)
+	{
+		var map = out["t320"];
+		for(var i=0; i<area; i++) {  var qi=i<<2, mi=data[i];  img[qi]=(map[mi]>>8);  img[qi+1]=(map[256+mi]>>8);  img[qi+2]=(map[512+mi]>>8);  img[qi+3]=255;    }
+	}
+	else if(intp==5) 
+	{
+		var smpls = out["t258"]?out["t258"].length : 4;
+		var gotAlpha = smpls>4 ? 1 : 0;
+		for(var i=0; i<area; i++) {
+			var qi=i<<2, si=i*smpls;  var C=255-data[si], M=255-data[si+1], Y=255-data[si+2], K=(255-data[si+3])*(1/255);
+			img[qi]=~~(C*K+0.5);  img[qi+1]=~~(M*K+0.5);  img[qi+2]=~~(Y*K+0.5);  img[qi+3]=255*(1-gotAlpha)+data[si+4]*gotAlpha;
+		}
+	}
+	else log("Unknown Photometric interpretation: "+intp);
+	return img;
+}
+
+UTIF.replaceIMG = function(imgs)
+{
+	if(imgs==null) imgs = document.getElementsByTagName("img");
+	var sufs = ["tif","tiff","dng","cr2","nef"]
+	for (var i=0; i<imgs.length; i++)
+	{
+		var img=imgs[i], src=img.getAttribute("src");  if(src==null) continue;
+		var suff=src.split(".").pop().toLowerCase();
+		if(sufs.indexOf(suff)==-1) continue;
+		var xhr = new XMLHttpRequest();  UTIF._xhrs.push(xhr);  UTIF._imgs.push(img);
+		xhr.open("GET", src);  xhr.responseType = "arraybuffer";
+		xhr.onload = UTIF._imgLoaded;   xhr.send();
+	}
+}
+
+UTIF._xhrs = [];  UTIF._imgs = [];
+UTIF._imgLoaded = function(e)
+{
+	var buff = e.target.response;
+	var ifds = UTIF.decode(buff);  //console.log(ifds);
+	var vsns = ifds, ma=0, page=vsns[0];  if(ifds[0].subIFD) vsns = vsns.concat(ifds[0].subIFD);
+	for(var i=0; i<vsns.length; i++) {
+		var img = vsns[i];
+		if(img["t258"]==null || img["t258"].length<3) continue;
+		var ar = img["t256"]*img["t257"];
+		if(ar>ma) {  ma=ar;  page=img;  }
+	}
+	UTIF.decodeImage(buff, page, ifds);
+	var rgba = UTIF.toRGBA8(page), w=page.width, h=page.height;
+	var ind = UTIF._xhrs.indexOf(e.target), img = UTIF._imgs[ind];
+	UTIF._xhrs.splice(ind,1);  UTIF._imgs.splice(ind,1);
+	var cnv = document.createElement("canvas");  cnv.width=w;  cnv.height=h;
+	var ctx = cnv.getContext("2d"), imgd = ctx.createImageData(w,h);
+	for(var i=0; i<rgba.length; i++) imgd.data[i]=rgba[i];       ctx.putImageData(imgd,0,0);
+	img.setAttribute("src",cnv.toDataURL());
+}
+
+
+UTIF._binBE =
+{
+	nextZero   : function(data, o) {  while(data[o]!=0) o++;  return o;  },
+	readUshort : function(buff, p) {  return (buff[p]<< 8) |  buff[p+1];  },
+	readShort  : function(buff, p) {  var a=UTIF._binBE.ui8;  a[0]=buff[p+1];  a[1]=buff[p+0];                                    return UTIF._binBE. i16[0];  },
+	readInt    : function(buff, p) {  var a=UTIF._binBE.ui8;  a[0]=buff[p+3];  a[1]=buff[p+2];  a[2]=buff[p+1];  a[3]=buff[p+0];  return UTIF._binBE. i32[0];  },
+	readUint   : function(buff, p) {  var a=UTIF._binBE.ui8;  a[0]=buff[p+3];  a[1]=buff[p+2];  a[2]=buff[p+1];  a[3]=buff[p+0];  return UTIF._binBE.ui32[0];  },
+	readASCII  : function(buff, p, l) {  var s = "";   for(var i=0; i<l; i++) s += String.fromCharCode(buff[p+i]);   return s; },
+	readFloat  : function(buff, p) {  var a=UTIF._binBE.ui8;  for(var i=0;i<4;i++) a[i]=buff[p+3-i];  return UTIF._binBE.fl32[0];  },
+	readDouble : function(buff, p) {  var a=UTIF._binBE.ui8;  for(var i=0;i<8;i++) a[i]=buff[p+7-i];  return UTIF._binBE.fl64[0];  },
+
+	writeUshort: function(buff, p, n) {  buff[p] = (n>> 8)&255;  buff[p+1] =  n&255;  },
+	writeUint  : function(buff, p, n) {  buff[p] = (n>>24)&255;  buff[p+1] = (n>>16)&255;  buff[p+2] = (n>>8)&255;  buff[p+3] = (n>>0)&255;  },
+	writeASCII : function(buff, p, s) {  for(var i = 0; i < s.length; i++)  buff[p+i] = s.charCodeAt(i);  },
+	writeDouble: function(buff, p, n)
+	{
+		UTIF._binBE.fl64[0] = n;
+		for (var i = 0; i < 8; i++) buff[p + i] = UTIF._binBE.ui8[7 - i];
+	}
+}
+UTIF._binBE.ui8  = new Uint8Array  (8);
+UTIF._binBE.i16  = new Int16Array  (UTIF._binBE.ui8.buffer);
+UTIF._binBE.i32  = new Int32Array  (UTIF._binBE.ui8.buffer);
+UTIF._binBE.ui32 = new Uint32Array (UTIF._binBE.ui8.buffer);
+UTIF._binBE.fl32 = new Float32Array(UTIF._binBE.ui8.buffer);
+UTIF._binBE.fl64 = new Float64Array(UTIF._binBE.ui8.buffer);
+
+UTIF._binLE =
+{
+	nextZero   : UTIF._binBE.nextZero,
+	readUshort : function(buff, p) {  return (buff[p+1]<< 8) |  buff[p];  },
+	readShort  : function(buff, p) {  var a=UTIF._binBE.ui8;  a[0]=buff[p+0];  a[1]=buff[p+1];                                    return UTIF._binBE. i16[0];  },
+	readInt    : function(buff, p) {  var a=UTIF._binBE.ui8;  a[0]=buff[p+0];  a[1]=buff[p+1];  a[2]=buff[p+2];  a[3]=buff[p+3];  return UTIF._binBE. i32[0];  },
+	readUint   : function(buff, p) {  var a=UTIF._binBE.ui8;  a[0]=buff[p+0];  a[1]=buff[p+1];  a[2]=buff[p+2];  a[3]=buff[p+3];  return UTIF._binBE.ui32[0];  },
+	readASCII  : UTIF._binBE.readASCII,
+	readFloat  : function(buff, p) {  var a=UTIF._binBE.ui8;  for(var i=0;i<4;i++) a[i]=buff[p+  i];  return UTIF._binBE.fl32[0];  },
+	readDouble : function(buff, p) {  var a=UTIF._binBE.ui8;  for(var i=0;i<8;i++) a[i]=buff[p+  i];  return UTIF._binBE.fl64[0];  }
+}
+UTIF._copyTile = function(tb, tw, th, b, w, h, xoff, yoff)
+{
+	//log("copyTile", tw, th,  w, h, xoff, yoff);
+	var xlim = Math.min(tw, w-xoff);
+	var ylim = Math.min(th, h-yoff);
+	for(var y=0; y<ylim; y++)
+	{
+		var tof = (yoff+y)*w+xoff;
+		var sof = y*tw;
+		for(var x=0; x<xlim; x++) b[tof+x] = tb[sof+x];
+	}
+}
+
+UTIF.LosslessJpegDecode = (function(){function t(Z){this.w=Z;this.N=0;this._=0;this.G=0}t.prototype={t:function(Z){this.N=Math.max(0,Math.min(this.w.length,Z))},i:function(){return this.w[this.N++]},l:function(){var Z=this.N;
+this.N+=2;return this.w[Z]<<8|this.w[Z+1]},J:function(){if(this._==0){this.G=this.w[this.N];this.N+=1+(this.G+1>>>8);
+this._=8}return this.G>>>--this._&1},Z:function(Z){var X=this._,s=this.G,E=Math.min(X,Z);Z-=E;X-=E;var Y=s>>>X&(1<<E)-1;
+while(Z>0){s=this.w[this.N];this.N+=1+(s+1>>>8);E=Math.min(8,Z);Z-=E;X=8-E;Y<<=E;Y|=s>>>X&(1<<E)-1}this._=X;
+this.G=s;return Y}};var i={};i.X=function(){return[0,0,-1]};i.s=function(Z,X,s){Z[i.Y(Z,0,s)+2]=X};i.Y=function(Z,X,s){if(Z[X+2]!=-1)return 0;
+if(s==0)return X;for(var E=0;E<2;E++){if(Z[X+E]==0){Z[X+E]=Z.length;Z.push(0);Z.push(0);Z.push(-1)}var Y=i.Y(Z,Z[X+E],s-1);
+if(Y!=0)return Y}return 0};i.B=function(Z,X){var s=0,E=0,Y=0,B=X._,$=X.G,e=X.N;while(!0){if(B==0){$=X.w[e];
+e+=1+($+1>>>8);B=8}Y=$>>>--B&1;s=Z[s+Y];E=Z[s+2];if(E!=-1){X._=B;X.G=$;X.N=e;return E}}return-1};function l(Z){this.z=new t(Z);
+this.D(this.z)}l.prototype={$:function(Z,X){this.Q=Z.i();this.F=Z.l();this.o=Z.l();var s=this.O=Z.i();
+this.L=[];for(var E=0;E<s;E++){var Y=Z.i(),B=Z.i();Z.i();this.L[Y]=E}Z.t(Z.N+X-(6+s*3))},e:function(){var Z=0,X=this.z.i();
+if(this.H==null)this.H={};var s=this.H[X]=i.X(),E=[];for(var Y=0;Y<16;Y++){E[Y]=this.z.i();Z+=E[Y]}for(var Y=0;
+Y<16;Y++)for(var B=0;B<E[Y];B++)i.s(s,this.z.i(),Y+1);return Z+17},W:function(Z){while(Z>0)Z-=this.e()},p:function(Z,X){var s=Z.i();
+if(!this.U){this.U=[]}for(var E=0;E<s;E++){var Y=Z.i(),B=Z.i();this.U[this.L[Y]]=this.H[B>>>4]}this.g=Z.i();
+Z.t(Z.N+X-(2+s*2))},D:function(Z){var X=!1,s=Z.l();if(s!==l.q)return;do{var s=Z.l(),E=Z.l()-2;switch(s){case l.m:this.$(Z,E);
+break;case l.K:this.W(E);break;case l.V:this.p(Z,E);X=!0;break;default:Z.t(Z.N+E);break}}while(!X)},I:function(Z,X){var s=i.B(X,Z);
+if(s==16)return-32768;var E=Z.Z(s);if((E&1<<s-1)==0)E-=(1<<s)-1;return E},B:function(Z,X){var s=this.z,E=this.O,Y=this.F,B=this.I,$=this.g,e=this.o*E,W=this.U;
+for(var p=0;p<E;p++){Z[p]=B(s,W[p])+(1<<this.Q-1)}for(var D=E;D<e;D+=E){for(var p=0;p<E;p++)Z[D+p]=B(s,W[p])+Z[D+p-E]}var I=X;
+for(var m=1;m<Y;m++){for(var p=0;p<E;p++){Z[I+p]=B(s,W[p])+Z[I+p-X]}for(var D=E;D<e;D+=E){for(var p=0;
+p<E;p++){var K=I+D+p,q=Z[K-E];if($==6)q=Z[K-X]+(q-Z[K-E-X]>>>1);Z[K]=q+B(s,W[p])}}I+=X}}};l.m=65475;
+l.K=65476;l.q=65496;l.V=65498;function J(Z){var X=new l(Z),s=X.Q>8?Uint16Array:Uint8Array,E=new s(X.o*X.F*X.O),Y=X.o*X.O;
+X.B(E,Y);return E}return J}())
+
+
+
+
+})(UTIF, pako);
+})();
+</script>
+<script>
+'use strict';
+/* ============================================================
+   IL RETICOLO — georeferenziazione di foto storiche
+   suite Precessio · metodo: camera proiettiva P = [H | w]
+   Ogni coordinata porta la sua FONTE. Le stime sono dichiarate.
+   ============================================================ */
+
+/* ---------- 1. CATALOGO DEI PUNTI ---------- */
+const MIS = 'misurato da Ade, Google Earth Pro, 21/7/2026';
+const MIS5 = 'misurato da Ade, Google Earth Pro, 5/8/2026';
+const STIMA = 'STIMA dichiarata, da misurare';
+const RIC = 'ricostruito: centro misurato da Ade + lato e orientamento pubblicati (Cole 1925/Dorner/Lehner; Nell & Ruggles 2012)';
+
+/* Quote delle basi in metri s.l.m. Sono STIME, tranne il dosso.
+   Contano solo le DIFFERENZE fra loro: sono modificabili dal pannello. */
+const Q = {cheope:60, chefren:70, micerino:66, sfinge:22, dosso:73, hCheope:138.8};
+
+const CAT = [
+  {id:'che_no', nome:'Cheope \u00b7 spigolo NO', gr:'Cheope', lat:29.980180, lon:31.133004, k:'cheope', t:'suolo', f:RIC},
+  {id:'che_ne', nome:'Cheope \u00b7 spigolo NE', gr:'Cheope', lat:29.980182, lon:31.135391, k:'cheope', t:'suolo', f:RIC},
+  {id:'che_se', nome:'Cheope \u00b7 spigolo SE', gr:'Cheope', lat:29.978104, lon:31.135394, k:'cheope', t:'suolo', f:RIC},
+  {id:'che_so', nome:'Cheope \u00b7 spigolo SO', gr:'Cheope', lat:29.978102, lon:31.133007, k:'cheope', t:'suolo', f:RIC},
+  {id:'che_cima', nome:'Cheope \u00b7 cima', gr:'Cheope', lat:29.979142, lon:31.134199, k:'cimaCheope', t:'cima', f:'centro '+MIS+'; altezza da rilievi pubblicati'},
+
+  {id:'chf_no', nome:'Chefren \u00b7 spigolo NO', gr:'Chefren', lat:29.976959, lon:31.129634, k:'chefren', t:'suolo', f:RIC},
+  {id:'chf_ne', nome:'Chefren \u00b7 spigolo NE', gr:'Chefren', lat:29.976962, lon:31.131865, k:'chefren', t:'suolo', f:RIC},
+  {id:'chf_se', nome:'Chefren \u00b7 spigolo SE', gr:'Chefren', lat:29.975021, lon:31.131868, k:'chefren', t:'suolo', f:RIC},
+  {id:'chf_so', nome:'Chefren \u00b7 spigolo SO', gr:'Chefren', lat:29.975018, lon:31.129637, k:'chefren', t:'suolo', f:RIC},
+  {id:'chf_cima', nome:'Chefren \u00b7 cima', gr:'Chefren', lat:29.975990, lon:31.130751, k:'cimaChefren', t:'cima', f:'centro '+MIS+'; altezza 136,4 m, rilievi pubblicati'},
+
+  {id:'mic_no', nome:'Micerino \u00b7 spigolo NO', gr:'Micerino', lat:29.972945, lon:31.127739, k:'micerino', t:'suolo', f:RIC},
+  {id:'mic_ne', nome:'Micerino \u00b7 spigolo NE', gr:'Micerino', lat:29.972939, lon:31.128810, k:'micerino', t:'suolo', f:RIC},
+  {id:'mic_se', nome:'Micerino \u00b7 spigolo SE', gr:'Micerino', lat:29.972007, lon:31.128803, k:'micerino', t:'suolo', f:RIC},
+  {id:'mic_so', nome:'Micerino \u00b7 spigolo SO', gr:'Micerino', lat:29.972013, lon:31.127732, k:'micerino', t:'suolo', f:RIC},
+  {id:'mic_cima', nome:'Micerino \u00b7 cima', gr:'Micerino', lat:29.972476, lon:31.128271, k:'cimaMicerino', t:'cima', f:'centro '+MIS+'; altezza ~61 m'},
+
+  {id:'g1a', nome:'G1-a \u00b7 centro', gr:'Satelliti', lat:29.978840, lon:31.136229, k:'cheope', t:'suolo', f:MIS},
+  {id:'g1b', nome:'G1-b \u00b7 centro', gr:'Satelliti', lat:29.978294, lon:31.136242, k:'cheope', t:'suolo', f:MIS},
+  {id:'g1c', nome:'G1-c \u00b7 centro', gr:'Satelliti', lat:29.977831, lon:31.136231, k:'cheope', t:'suolo', f:MIS},
+  {id:'g3a', nome:'G3-a \u00b7 centro', gr:'Satelliti', lat:29.971608, lon:31.128322, k:'micerino', t:'suolo', f:MIS},
+  {id:'g3b', nome:'G3-b \u00b7 centro', gr:'Satelliti', lat:29.971593, lon:31.127812, k:'micerino', t:'suolo', f:MIS},
+  {id:'g3c', nome:'G3-c \u00b7 centro', gr:'Satelliti', lat:29.971583, lon:31.127347, k:'micerino', t:'suolo', f:MIS},
+
+  {id:'sfinge', nome:'Sfinge \u00b7 centro', gr:'Prova indipendente', lat:29.97528, lon:31.13757, k:'sfinge', t:'suolo', f:MIS+'; quota '+STIMA}
+];
+
+const BER = [
+  {id:'piras',    nome:'Punto di Piras',       lat:29.98003,  lon:31.12626,  k:'dosso', f:'Piras, pag. 18'},
+  {id:'cresta_o', nome:'Cresta del dosso \u00b7 O', lat:29.980031, lon:31.125975, k:'dosso', f:MIS5},
+  {id:'cresta_e', nome:'Cresta del dosso \u00b7 E', lat:29.979969, lon:31.126922, k:'dosso', f:MIS5},
+  {id:'spec',     nome:'Speculare teorico',    lat:29.98203,  lon:31.12953,  k:'dosso', f:'calcolato; quota '+STIMA}
+];
+
+// quota assoluta di un elemento, in metri s.l.m.
+function quotaK(k){
+  if(k==='cimaCheope')   return Q.cheope   + Q.hCheope;
+  if(k==='cimaChefren')  return Q.chefren  + 136.4;
+  if(k==='cimaMicerino') return Q.micerino + 61.0;
+  return Q[k];
+}
+
+/* ---------- 2. GEODESIA ---------- */
+const LAT0 = 29.979142, LON0 = 31.134199;          // centro di Cheope (misurato)
+const _f = LAT0*Math.PI/180;
+const MLAT = 111132.92 - 559.82*Math.cos(2*_f) + 1.175*Math.cos(4*_f) - 0.0023*Math.cos(6*_f);
+const MLON = 111412.84*Math.cos(_f) - 93.5*Math.cos(3*_f) + 0.118*Math.cos(5*_f);
+const EN  = (lat,lon)=>({E:(lon-LON0)*MLON, N:(lat-LAT0)*MLAT});
+const LL  = (E,N)=>({lat:LAT0+N/MLAT, lon:LON0+E/MLON});
+const gms = (v,pos,neg)=>{const s=v<0?neg:pos;v=Math.abs(v);const g=Math.floor(v),m=Math.floor((v-g)*60),
+  se=((v-g)*60-m)*60;return `${g}°${String(m).padStart(2,'0')}'${se.toFixed(2).padStart(5,'0')}"${s}`;};
+
+/* ---------- 3. ALGEBRA ---------- */
+function solveLin(A,b,n){
+  const M=A.slice(), y=b.slice();
+  for(let i=0;i<n;i++){
+    let piv=i;
+    for(let r=i+1;r<n;r++) if(Math.abs(M[r*n+i])>Math.abs(M[piv*n+i])) piv=r;
+    if(Math.abs(M[piv*n+i])<1e-13) return null;
+    if(piv!==i){for(let c=0;c<n;c++){const t=M[i*n+c];M[i*n+c]=M[piv*n+c];M[piv*n+c]=t;}
+      const t=y[i];y[i]=y[piv];y[piv]=t;}
+    for(let r=i+1;r<n;r++){
+      const f=M[r*n+i]/M[i*n+i]; if(!f) continue;
+      for(let c=i;c<n;c++) M[r*n+c]-=f*M[i*n+c];
+      y[r]-=f*y[i];
+    }
+  }
+  const x=new Array(n).fill(0);
+  for(let i=n-1;i>=0;i--){let s=y[i];for(let c=i+1;c<n;c++)s-=M[i*n+c]*x[c];x[i]=s/M[i*n+i];}
+  return x;
+}
+function lsq(rows,rhs,n){
+  const A=new Array(n*n).fill(0), b=new Array(n).fill(0);
+  for(let k=0;k<rows.length;k++){
+    const r=rows[k], y=rhs[k];
+    for(let i=0;i<n;i++){b[i]+=r[i]*y;for(let j=0;j<n;j++)A[i*n+j]+=r[i]*r[j];}
+  }
+  return solveLin(A,b,n);
+}
+
+/* ---------- 4. CAMERA  P = [H | w] ----------
+   p = [h1..h8, w1,w2,w3]; punto (X,Y,Z) normalizzato -> pixel normalizzati  */
+function proj(p,X,Y,Z){
+  const z = p[6]*X + p[7]*Y + 1 + p[10]*Z;
+  return [ (p[0]*X+p[1]*Y+p[2]+p[8]*Z)/z, (p[3]*X+p[4]*Y+p[5]+p[9]*Z)/z ];
+}
+function stimaH(pt){
+  if(pt.length<4) return null;
+  const rows=[],rhs=[];
+  for(const q of pt){
+    rows.push([q.X,q.Y,1,0,0,0,-q.u*q.X,-q.u*q.Y]); rhs.push(q.u);
+    rows.push([0,0,0,q.X,q.Y,1,-q.v*q.X,-q.v*q.Y]); rhs.push(q.v);
+  }
+  return lsq(rows,rhs,8);
+}
+function stimaW(h,pt){
+  if(pt.length<2) return null;
+  const rows=[],rhs=[];
+  for(const q of pt){
+    const q1=h[0]*q.X+h[1]*q.Y+h[2], q2=h[3]*q.X+h[4]*q.Y+h[5], q3=h[6]*q.X+h[7]*q.Y+1;
+    rows.push([q.Z,0,-q.u*q.Z]); rhs.push(q.u*q3-q1);
+    rows.push([0,q.Z,-q.v*q.Z]); rhs.push(q.v*q3-q2);
+  }
+  return lsq(rows,rhs,3);
+}
+function residui(p,pt){
+  const r=[];
+  for(const q of pt){const[a,b]=proj(p,q.X,q.Y,q.Z);r.push(a-q.u,b-q.v);}
+  return r;
+}
+const costo=(p,pt)=>residui(p,pt).reduce((s,x)=>s+x*x,0);
+
+function raffina(p0,pt,mask,iter){
+  let p=p0.slice(), lam=1e-3, c=costo(p,pt);
+  const n=mask.length;
+  for(let it=0;it<iter;it++){
+    const r=residui(p,pt), m=r.length, J=[];
+    for(let j=0;j<n;j++){
+      const k=mask[j], hh=Math.max(1e-7,Math.abs(p[k])*1e-6);
+      const pp=p.slice(); pp[k]+=hh; const rp=residui(pp,pt);
+      const pm=p.slice(); pm[k]-=hh; const rm=residui(pm,pt);
+      const col=new Array(m);
+      for(let i=0;i<m;i++) col[i]=(rp[i]-rm[i])/(2*hh);
+      J.push(col);
+    }
+    const A=new Array(n*n).fill(0), b=new Array(n).fill(0);
+    for(let i=0;i<m;i++)
+      for(let a=0;a<n;a++){
+        b[a]-=J[a][i]*r[i];
+        for(let z=0;z<n;z++) A[a*n+z]+=J[a][i]*J[z][i];
+      }
+    let ok=false;
+    for(let t=0;t<8&&!ok;t++){
+      const Ad=A.slice();
+      for(let a=0;a<n;a++) Ad[a*n+a]*=(1+lam);
+      const d=solveLin(Ad,b,n);
+      if(!d){lam*=10;continue;}
+      const pn=p.slice(); for(let j=0;j<n;j++) pn[mask[j]]+=d[j];
+      const cn=costo(pn,pt);
+      if(cn<c){p=pn;c=cn;lam=Math.max(lam/3,1e-10);ok=true;} else lam*=6;
+    }
+    if(!ok) break;
+  }
+  return p;
+}
+
+function affineDaPunti(tutti){
+  // Bussola provvisoria. E' un'omografia con h7=h8=0 e w=0, quindi riusa proj() tale e quale.
+  // TRE FILTRI, ognuno per un modo diverso di sbagliare:
+  //  1. solo punti di SUOLO — le cime sporgono 130-200 m e la prospettiva le sposta
+  //     (misurato: un'affine sulle tre cime da' un nord 87 gradi fuori)
+  //  2. almeno DUE monumenti diversi — con una piramide sola, chi scambia NE con SO
+  //     ottiene un nord girato di 90 gradi e niente lo smentisce. Due monumenti si
+  //     ancorano a vicenda, perche' la loro distanza reciproca e' fissata dalle coordinate
+  //  3. non allineati, e con residuo basso — se il residuo e' alto, l'assegnazione degli
+  //     spigoli e' sbagliata, e allora meglio nessuna bussola che una bussola girata
+  const pt = tutti.filter(q=>q.piano);
+  if(pt.length<4) return null;
+  const monumenti = new Set(pt.map(q=>q.gr));
+  if(monumenti.size<2) return null;
+  let mx=0,my=0;
+  pt.forEach(q=>{mx+=q.X;my+=q.Y;}); mx/=pt.length; my/=pt.length;
+  let sxx=0,syy=0,sxy=0;
+  pt.forEach(q=>{const a=q.X-mx,b=q.Y-my;sxx+=a*a;syy+=b*b;sxy+=a*b;});
+  const tr=sxx+syy, dt=sxx*syy-sxy*sxy;
+  const rad=Math.sqrt(Math.max(0,tr*tr/4-dt));
+  const l1=tr/2+rad, l2=tr/2-rad;
+  if(!(l1>0) || Math.sqrt(l2/l1) < 0.10) return null;
+  const rows=[],rhs=[];
+  for(const q of pt){
+    rows.push([q.X,q.Y,1,0,0,0]); rhs.push(q.u);
+    rows.push([0,0,0,q.X,q.Y,1]); rhs.push(q.v);
+  }
+  const a=lsq(rows,rhs,6);
+  if(!a || !a.every(x=>isFinite(x))) return null;
+  const p=[a[0],a[1],a[2],a[3],a[4],a[5],0,0,0,0,0];
+  // residuo dell'affine contro la dispersione dei punti nell'immagine
+  let s2=0, r2=0, iu=0, iv=0;
+  pt.forEach(q=>{iu+=q.u;iv+=q.v;}); iu/=pt.length; iv/=pt.length;
+  for(const q of pt){
+    const [u,v]=proj(p,q.X,q.Y,q.Z);
+    s2+=(u-q.u)**2+(v-q.v)**2;
+    r2+=(q.u-iu)**2+(q.v-iv)**2;
+  }
+  const rel=Math.sqrt(s2/Math.max(r2,1e-12));
+  if(!(rel<0.12)) return null;   // spigoli assegnati male: niente bussola
+  return p;
+}
+
+function risolvi(pt){
+  const suolo=pt.filter(q=>q.piano), alti=pt.filter(q=>!q.piano);
+  const base = suolo.length>=4 ? suolo : pt;
+  const h = stimaH(base);
+  if(!h) return null;
+  let w = stimaW(h,alti) || [0,0,0];
+  let p = h.concat(w);
+  let modo;
+  if(alti.length>=2 && pt.length>=6){
+    p = raffina(p,pt,[0,1,2,3,4,5,6,7,8,9,10],45); modo='completo';
+  } else if(suolo.length>=4){
+    p = h.concat([0,0,0]);
+    p = raffina(p,suolo,[0,1,2,3,4,5,6,7],30); modo='piano';
+  } else return null;
+  return {p, modo, nSuolo:suolo.length, nAlti:alti.length};
+}
+
+function centroCamera(p){
+  const c1=[p[0],p[3],p[6]], c2=[p[1],p[4],p[7]], c3=[p[2],p[5],1], w=[p[8],p[9],p[10]];
+  const det=(a,b,c)=> a[0]*(b[1]*c[2]-c[1]*b[2]) - b[0]*(a[1]*c[2]-c[1]*a[2]) + c[0]*(a[1]*b[2]-b[1]*a[2]);
+  const C4=-det(c1,c2,w);
+  if(Math.abs(C4)<1e-13) return null;
+  return [det(c2,w,c3)/C4, -det(c1,w,c3)/C4, det(c1,c2,c3)/C4];
+}
+
+/* ---------- 5. STATO ---------- */
+const S = {
+  img:null, nomeFile:'', SU:1, cx:0, cy:0, SW:400,
+  vista:{s:1,tx:0,ty:0},
+  segni:{},            // id -> {u,v} in pixel immagine
+  usa:{},              // id -> bool (dentro il calcolo)
+  sel:null, trascina:null, pan:null,
+  sol:null, res:{}, loo:{}, mc:null,
+  mouse:null, fattoreRis:1, approx:null, piramide:null, appenaPosato:null, forsePosa:null, ambiguo:0, escluso:null,
+  imgOriginale:null, restaurata:false, modoRitaglio:false, ritInizio:null, ritRett:null
+};
+CAT.forEach(c=>S.usa[c.id]=true);
+
+// ordine di avvio: i soli spigoli che si riconoscono davvero in una ripresa obliqua
+const AVVIO=['che_se','che_ne','che_so','che_cima','chf_se','chf_ne','chf_cima','chf_so','mic_se','mic_ne','mic_so','mic_cima'];
+
+const $ = s=>document.querySelector(s);
+const cv=$('#cv'), ctx=cv.getContext('2d');
+
+function mondo(c){
+  const e=EN(c.lat,c.lon);
+  return {X:e.E/S.SW, Y:e.N/S.SW, Z:(quotaK(c.k)-Q.cheope)/S.SW};
+}
+function mondoB(b){
+  const e=EN(b.lat,b.lon);
+  return {X:e.E/S.SW, Y:e.N/S.SW, Z:(quotaK(b.k)-Q.cheope)/S.SW};
+}
+const toPx = a=>[a[0]*S.SU+S.cx, a[1]*S.SU+S.cy];
+const toNorm = (u,v)=>[(u-S.cx)/S.SU,(v-S.cy)/S.SU];
+function proiettaPx(p,m){ return toPx(proj(p,m.X,m.Y,m.Z)); }
+
+function prossimoDaPosare(){
+  const libero=id=>!S.segni[id] || !S.usa[id];
+  for(const id of AVVIO) if(libero(id)) return id;
+  for(const c of CAT) if(libero(c.id)) return c.id;
+  return null;
+}
+
+// A CHI appartiene un clic. Con una soluzione in mano lo strumento sa gia' dove
+// cade ogni spigolo del catalogo: quindi non chiede piu' all'utente di dichiararlo
+// prima, glielo dice lui dopo. Senza soluzione ripiega sull'ordine di avvio.
+function fitAffidabile(){
+  // il riconoscimento automatico si appoggia alla soluzione corrente: se quella e'
+  // sbagliata, ogni nome che propone e' sbagliato E si autoconferma. Quindi prima
+  // di battezzare qualcosa, lo strumento deve avere una soluzione che regge.
+  if(!S.sol) return false;
+  const pt=puntiAttivi();
+  if(pt.length<5) return false;
+  let s2=0, r2=0, mu=0, mv=0;
+  pt.forEach(q=>{mu+=q.u;mv+=q.v;}); mu/=pt.length; mv/=pt.length;
+  for(const q of pt){
+    const [x,y]=proj(S.sol.p,q.X,q.Y,q.Z);
+    s2+=((x-q.u)*S.SU)**2+((y-q.v)*S.SU)**2;
+    r2+=((q.u-mu)*S.SU)**2+((q.v-mv)*S.SU)**2;
+  }
+  const rms=Math.sqrt(s2/pt.length), disp=Math.sqrt(r2/pt.length);
+  // in modo "solo piano" lo scarto e' gonfiato dai dislivelli fra le basi, non da
+  // errori di mano: la soglia va allargata, altrimenti rifiuta anche i casi buoni
+  const soglia = Math.max(S.sol.modo==='completo'? 12 : 30, disp*0.02);
+  return rms < soglia;
+}
+
+function assegnaClic(iu,iv){
+  if(fitAffidabile()){
+    const p=S.sol.p;
+    let primo=null,d1=1e9,d2=1e9;
+    for(const c of CAT){
+      if(S.segni[c.id] && S.usa[c.id]) continue;   // escluso = riassegnabile
+      const [x,y]=proiettaPx(p,mondo(c));
+      const d=Math.hypot(x-iu,y-iv)*S.vista.s;
+      if(d<d1){ d2=d1; d1=d; primo=c.id; } else if(d<d2) d2=d;
+    }
+    // e il riconoscimento dev'essere NETTO: il secondo candidato almeno due volte
+    // piu' lontano, altrimenti sto tirando a indovinare fra due spigoli vicini
+    if(primo && d1<90 && d2>1.7*d1) return {id:primo, sicuro:true, dist:d1};
+    // Riconoscimento incerto. NON ripiego sull'ordine di avvio: metterebbe
+    // un'etichetta a caso su un clic ben fatto, ed e' esattamente il modo in cui
+    // uno strumento fa sbagliare chi si fida. Meglio non posare e dirlo.
+    return {ambiguo:true};
+  }
+  // L'ordine di avvio vale SOLO all'inizio, quando non c'e' ancora niente su cui
+  // riconoscere. Dopo, se il calcolo non regge, e' segno che qualcosa e' storto:
+  // continuare a distribuire etichette in fila propagherebbe l'errore.
+  if(Object.keys(S.segni).length < 8){
+    const id=prossimoDaPosare();
+    if(id) return {id, sicuro:false};
+  }
+  return {ambiguo:true};
+}
+
+const PREF={Cheope:'che', Chefren:'chf', Micerino:'mic'};
+function diagnosiMonumenti(){
+  // Il controllo delle distanze cerca incoerenze DENTRO l'insieme dei punti: se sono
+  // tutti coerenti fra loro ma posati sulle piramidi sbagliate, non se ne accorge.
+  // Qui riprovo il calcolo scambiando l'identita' dei monumenti fra loro.
+  const pt=puntiAttivi().filter(q=>{const c=CAT.find(x=>x.id===q.id);return q.piano&&PREF[c.gr];});
+  if(pt.length<6) return null;
+  if(new Set(pt.map(q=>CAT.find(c=>c.id===q.id).gr)).size<2) return null;
+  const mons=['Cheope','Chefren','Micerino'];
+  const perms=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+  const esiti=[];
+  for(const pm of perms){
+    const mappa={}; mons.forEach((m,i)=>mappa[m]=mons[pm[i]]);
+    const nuovi=[]; let ok=true;
+    for(const q of pt){
+      const c=CAT.find(x=>x.id===q.id);
+      const suff=c.id.split('_')[1];
+      const nc=CAT.find(x=>x.id===PREF[mappa[c.gr]]+'_'+suff);
+      if(!nc){ok=false;break;}
+      const m=mondo(nc);
+      nuovi.push({id:nc.id,X:m.X,Y:m.Y,Z:m.Z,u:q.u,v:q.v,piano:true});
+    }
+    if(!ok) continue;
+    const sol=risolvi(nuovi); if(!sol) continue;
+    let s2=0;
+    for(const q of nuovi){const[x,y]=proj(sol.p,q.X,q.Y,q.Z);s2+=((x-q.u)*S.SU)**2+((y-q.v)*S.SU)**2;}
+    esiti.push({mappa, identita:(pm[0]===0&&pm[1]===1&&pm[2]===2), rms:Math.sqrt(s2/nuovi.length)});
+  }
+  const mio=esiti.find(e=>e.identita);
+  const altri=esiti.filter(e=>!e.identita).sort((x,y)=>x.rms-y.rms);
+  if(!mio||!altri.length) return null;
+  if(altri[0].rms*3 < mio.rms){
+    const cambi=mons.filter(m=>altri[0].mappa[m]!==m)
+      .map(m=>`quella che chiami <b>${m}</b> \u00e8 <b>${altri[0].mappa[m]}</b>`);
+    return {rms:altri[0].rms, mio:mio.rms, cambi};
+  }
+  return null;
+}
+
+function puntiSospetti(){
+  const pt=[];
+  for(const c of CAT){
+    const g=S.segni[c.id];
+    if(!g || !S.usa[c.id] || c.t!=='suolo') continue;
+    const e=EN(c.lat,c.lon);
+    pt.push({id:c.id, nome:c.nome, u:g.u, v:g.v, E:e.E, N:e.N});
+  }
+  if(pt.length<3) return [];
+  const coppie=[];
+  for(let i=0;i<pt.length;i++) for(let j=i+1;j<pt.length;j++){
+    const dp=Math.hypot(pt[i].u-pt[j].u, pt[i].v-pt[j].v);
+    const dm=Math.hypot(pt[i].E-pt[j].E, pt[i].N-pt[j].N);
+    if(dp<2||dm<2) continue;
+    coppie.push({i,j,scala:dm/dp});
+  }
+  if(coppie.length<3) return [];
+  const ord=coppie.map(x=>x.scala).sort((a,b)=>a-b);
+  const med=ord[Math.floor(ord.length/2)];
+  const colpe={}, peggio={};
+  for(const x of coppie){
+    const f=x.scala/med, k=Math.max(f,1/f);
+    if(k>2.5){
+      colpe[x.i]=(colpe[x.i]||0)+1; colpe[x.j]=(colpe[x.j]||0)+1;
+      peggio[x.i]=Math.max(peggio[x.i]||0,k); peggio[x.j]=Math.max(peggio[x.j]||0,k);
+    }
+  }
+  return Object.keys(colpe).map(k=>({p:pt[k], n:colpe[k], k:peggio[k]}))
+    .sort((a,b)=> b.n-a.n || b.k-a.k);
+}
+
+function puntiAttivi(){
+  const out=[];
+  for(const c of CAT){
+    const s=S.segni[c.id]; if(!s||!S.usa[c.id]) continue;
+    const m=mondo(c), n=toNorm(s.u,s.v);
+    out.push({id:c.id,gr:c.gr,X:m.X,Y:m.Y,Z:m.Z,u:n[0],v:n[1],piano:c.t==='suolo'});
+  }
+  return out;
+}
+
+/* ---------- 6. CALCOLO COMPLETO ---------- */
+function ricalcola(){
+  S.res={}; S.loo={}; S.mc=null;
+  const pt=puntiAttivi();
+  S.sol = pt.length>=4 ? risolvi(pt) : null;
+  S.approx = S.sol ? null : affineDaPunti(pt);
+  if(S.sol){
+    // residui di adattamento
+    for(const q of pt){
+      const [a,b]=proj(S.sol.p,q.X,q.Y,q.Z);
+      const [pu,pv]=toPx([a,b]), s=S.segni[q.id];
+      S.res[q.id]=Math.hypot(pu-s.u,pv-s.v);
+    }
+    // lascia-fuori-uno
+    if(pt.length>=6){
+      for(const q of pt){
+        const r=risolvi(pt.filter(z=>z.id!==q.id));
+        if(!r) continue;
+        const [a,b]=proj(r.p,q.X,q.Y,q.Z);
+        const [pu,pv]=toPx([a,b]), s=S.segni[q.id];
+        S.loo[q.id]=Math.hypot(pu-s.u,pv-s.v);
+      }
+    }
+  }
+  disegnaElenco(); mostraEsito(); mostraBersagli(); disegna();
+}
+
+function mondoDaPixel(p,iu,iv,Zn){
+  const [un,vn]=toNorm(iu,iv);
+  const A=[p[0]-un*p[6], p[1]-un*p[7], p[3]-vn*p[6], p[4]-vn*p[7]];
+  const b=[un*(1+p[10]*Zn)-p[2]-p[8]*Zn, vn*(1+p[10]*Zn)-p[5]-p[9]*Zn];
+  const det=A[0]*A[3]-A[1]*A[2];
+  if(!(Math.abs(det)>1e-12)) return null;
+  return {X:(b[0]*A[3]-A[1]*b[1])/det, Y:(A[0]*b[1]-b[0]*A[2])/det, Z:Zn};
+}
+
+function versoNord(p,m){
+  // direzione (in pixel immagine) verso cui punta il nord, misurata attorno a m
+  const a=proiettaPx(p,m);
+  const n=proiettaPx(p,{X:m.X, Y:m.Y+30/S.SW, Z:m.Z});
+  const e=proiettaPx(p,{X:m.X+30/S.SW, Y:m.Y, Z:m.Z});
+  const dn=[n[0]-a[0],n[1]-a[1]], de=[e[0]-a[0],e[1]-a[1]];
+  const ln=Math.hypot(...dn), le=Math.hypot(...de);
+  if(!(ln>1e-9)||!(le>1e-9)) return null;
+  return {n:[dn[0]/ln,dn[1]/ln], e:[de[0]/le,de[1]/le]};
+}
+
+function baricentroMondo(){
+  let X=0,Y=0,Z=0,k=0;
+  for(const c of CAT){ if(!S.segni[c.id]) continue; const m=mondo(c); X+=m.X;Y+=m.Y;Z+=m.Z;k++; }
+  return k? {X:X/k,Y:Y/k,Z:Z/k} : null;
+}
+
+function scalaMetri(p,m){ // metri per pixel attorno a un punto del mondo
+  const a=proiettaPx(p,m);
+  const de=proiettaPx(p,{X:m.X+1/S.SW,Y:m.Y,Z:m.Z});
+  const dn=proiettaPx(p,{X:m.X,Y:m.Y+1/S.SW,Z:m.Z});
+  const pe=Math.hypot(de[0]-a[0],de[1]-a[1]), pn=Math.hypot(dn[0]-a[0],dn[1]-a[1]);
+  const px=(pe+pn)/2;
+  return px>1e-9 ? 1/px : NaN;
+}
+
+/* ---------- 7. MONTE CARLO ---------- */
+const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+
+function monteCarlo(){
+  const pt=puntiAttivi();
+  if(pt.length<4||!S.sol){S.mc=null;return;}
+  const sig=parseFloat($('#sigma').value)/S.SU;
+  const N=Math.max(50,Math.min(3000,parseInt($('#mcN').value)||300));
+  const nubi={};
+  BER.forEach(b=>nubi[b.id]=[]);
+  let riusciti=0;
+  for(let k=0;k<N;k++){
+    const pert=pt.map(q=>({...q,u:q.u+gauss()*sig,v:q.v+gauss()*sig}));
+    const r=risolvi(pert);
+    if(!r) continue;
+    riusciti++;
+    for(const b of BER){
+      const m=mondoB(b);
+      nubi[b.id].push(toPx(proj(r.p,m.X,m.Y,m.Z)));
+    }
+  }
+  const out={n:riusciti,ell:{}};
+  for(const b of BER){
+    const c=nubi[b.id]; if(c.length<10) continue;
+    let mx=0,my=0; c.forEach(q=>{mx+=q[0];my+=q[1];}); mx/=c.length; my/=c.length;
+    let sxx=0,syy=0,sxy=0;
+    c.forEach(q=>{const dx=q[0]-mx,dy=q[1]-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+    sxx/=c.length; syy/=c.length; sxy/=c.length;
+    const tr=sxx+syy, dt=sxx*syy-sxy*sxy;
+    const l1=tr/2+Math.sqrt(Math.max(0,tr*tr/4-dt)), l2=tr/2-Math.sqrt(Math.max(0,tr*tr/4-dt));
+    const ang=0.5*Math.atan2(2*sxy,sxx-syy);
+    const k95=Math.sqrt(5.991);
+    out.ell[b.id]={mx,my,a:k95*Math.sqrt(Math.max(l1,0)),b:k95*Math.sqrt(Math.max(l2,0)),ang,
+      rms:Math.sqrt(sxx+syy)};
+  }
+  S.mc=out;
+  mostraMC(); disegna();
+}
+
+/* ---------- 8. DISEGNO ---------- */
+function ridimensiona(){
+  const r=$('#tela').getBoundingClientRect();
+  const d=window.devicePixelRatio||1;
+  cv.width=r.width*d; cv.height=r.height*d;
+  cv.style.width=r.width+'px'; cv.style.height=r.height+'px';
+  ctx.setTransform(d,0,0,d,0,0);
+  disegna();
+}
+const S2C = (u,v)=>[u*S.vista.s+S.vista.tx, v*S.vista.s+S.vista.ty];
+const C2S = (x,y)=>[(x-S.vista.tx)/S.vista.s, (y-S.vista.ty)/S.vista.s];
+
+let _atteso=false;
+function chiediDisegno(){
+  if(_atteso) return;
+  _atteso=true;
+  requestAnimationFrame(()=>{_atteso=false;disegna();});
+}
+function disegnaSfondo(){
+  const d=window.devicePixelRatio||1;
+  const w=cv.width/d, h=cv.height/d, s=S.vista.s;
+  // livello piu' piccolo che regge ancora lo zoom corrente
+  let liv=S.img, k=0;
+  if(S.piramide && S.piramide.length>1){
+    for(let i=0;i<S.piramide.length;i++){
+      if(S.piramide[i].width/S.img.width >= s){ liv=S.piramide[i]; k=i; } else break;
+    }
+  }
+  const f = liv.width/S.img.width;          // scala del livello scelto
+  // rettangolo visibile, in pixel dell'immagine originale
+  let [x0,y0]=C2S(0,0), [x1,y1]=C2S(w,h);
+  x0=Math.max(0,Math.floor(x0)); y0=Math.max(0,Math.floor(y0));
+  x1=Math.min(S.img.width,Math.ceil(x1)); y1=Math.min(S.img.height,Math.ceil(y1));
+  if(x1<=x0||y1<=y0) return;
+  const sx=x0*f, sy=y0*f, sw=(x1-x0)*f, sh=(y1-y0)*f;
+  if(sw<1||sh<1) return;
+  const [dx,dy]=S2C(x0,y0);
+  ctx.save();
+  ctx.imageSmoothingEnabled = s<1.5;
+  ctx.drawImage(liv, sx,sy,sw,sh, dx,dy,(x1-x0)*s,(y1-y0)*s);
+  ctx.restore();
+}
+
+function mostraZoom(){
+  if(!S.img) return;
+  const z=S.vista.s;
+  const base=`${S.nomeFile} \u2014 ${S.img.width}\u00d7${S.img.height} px`;
+  let coda=`  \u00b7  zoom ${z<1?('1:'+(1/z).toFixed(1)):(z.toFixed(1)+':1')}`;
+  let col='';
+  if(z>2.5){ coda+='  \u00b7  TROPPO VICINO: oltre 2:1 c\'\u00e8 solo grana, premi F'; col='#d4694f'; }
+  else if(z<0.35){ coda+='  \u00b7  vista d\'insieme, zooma prima di posare'; col='#8a723a'; }
+  const st=$('#stato');
+  st.textContent = base + coda + (S.fattoreRis>2 ? '  \u00b7  RISOLUZIONE BASSA' : '');
+  st.style.color = col || (S.fattoreRis>2 ? '#d4694f' : '');
+}
+
+function disegna(){
+  const w=cv.width/(window.devicePixelRatio||1), h=cv.height/(window.devicePixelRatio||1);
+  ctx.clearRect(0,0,w,h);
+  if(!S.img) return;
+  ctx.imageSmoothingEnabled = S.vista.s<1.5;
+  disegnaSfondo();
+  applicaOscura();
+
+  const p=S.sol?S.sol.p:null;
+
+  if(p){
+    if($('#cbBasi').checked) disegnaBasi(p);
+    if($('#cbLinea').checked) disegnaLinea(p);
+    disegnaBersagli(p);
+  }
+  disegnaSegni(p);
+  if(S.escluso) avvisoEscluso();
+  else if(S.ambiguo && Date.now()-S.ambiguo<2600) avvisoAmbiguo();
+  else invitoAPosare();
+  if($('#cbBussola').checked){
+    if(bussolaAffidabile()) disegnaBussola();
+    else if(S.img) avvisoBussola();
+  }
+  mostraZoom();
+  if(S.oscura.attiva && !S.oscura.rotta){
+    const w0=cv.clientWidth;
+    ctx.save();
+    ctx.fillStyle='rgba(90,40,25,.92)'; ctx.fillRect(w0-232,52,220,26);
+    ctx.strokeStyle='#d4694f'; ctx.lineWidth=1; ctx.strokeRect(w0-231.5,52.5,219,25);
+    ctx.restore();
+    testo('CAMERA OSCURA '+S.oscura.nero+'\u2013'+S.oscura.bianco+'  \u00b7  N per togliere',
+          w0-122, 65, '#ffb9a0', 11, 'center');
+  }
+  disegnaRettaglio();
+  if(S.mouse) disegnaMirino();
+  if($('#cbLente').checked && S.mouse) disegnaLente();
+}
+
+function poliLinea(p,punti,colore,largh,tratteg){
+  ctx.save(); ctx.strokeStyle=colore; ctx.lineWidth=largh;
+  if(tratteg) ctx.setLineDash(tratteg);
+  ctx.beginPath();
+  punti.forEach((m,i)=>{
+    const [a,b]=S2C(...proiettaPx(p,m));
+    i?ctx.lineTo(a,b):ctx.moveTo(a,b);
+  });
+  ctx.stroke(); ctx.restore();
+}
+
+function disegnaBasi(p){
+  const gruppi=[['che_no','che_ne','che_se','che_so'],
+                ['chf_no','chf_ne','chf_se','chf_so'],
+                ['mic_no','mic_ne','mic_se','mic_so']];
+  const sigle=['NO','NE','SE','SO'];
+  for(const g of gruppi){
+    const cs=g.map(id=>CAT.find(c=>c.id===id));
+    const ms=cs.map(mondo);
+    poliLinea(p,ms.concat([ms[0]]),'rgba(216,178,90,.55)',1.4);
+    // centro del quadrato, per spingere l'etichetta verso l'esterno
+    let sx=0,sy=0;
+    const px=ms.map(m=>S2C(...proiettaPx(p,m)));
+    px.forEach(q=>{sx+=q[0];sy+=q[1];}); sx/=4; sy/=4;
+    px.forEach((q,i)=>{
+      let dx=q[0]-sx, dy=q[1]-sy; const L=Math.hypot(dx,dy)||1;
+      const posato=!!S.segni[cs[i].id];
+      testo(sigle[i], q[0]+dx/L*19, q[1]+dy/L*19,
+            posato?'rgba(216,178,90,.45)':'#e8c877', 11, 'center');
+    });
+  }
+}
+
+function testo(t,x,y,colore,dim,allineo){
+  // alone scuro sotto: su una foto chiara il testo dorato sparisce
+  ctx.save();
+  ctx.font=(dim||12)+'px "SF Mono",Menlo,Consolas,monospace';
+  ctx.textAlign=allineo||'left'; ctx.textBaseline='middle';
+  ctx.lineJoin='round'; ctx.miterLimit=2;
+  ctx.strokeStyle='rgba(8,6,4,.92)'; ctx.lineWidth=3.5;
+  ctx.strokeText(t,x,y);
+  ctx.fillStyle=colore; ctx.fillText(t,x,y);
+  ctx.restore();
+}
+
+function disegnaLinea(p){
+  // prolungamento del lato nord verso ovest, dagli spigoli RICOSTRUITI del catalogo
+  const cNO=CAT.find(c=>c.id==='che_no'), cNE=CAT.find(c=>c.id==='che_ne');
+  const no=EN(cNO.lat,cNO.lon), ne=EN(cNE.lat,cNE.lon);
+  let dx=no.E-ne.E, dy=no.N-ne.N;
+  const lato=Math.hypot(dx,dy); dx/=lato; dy/=lato;
+  const pt=d=>({X:(no.E+dx*d)/S.SW, Y:(no.N+dy*d)/S.SW, Z:0});
+  const camp=[]; for(let d=0; d<=900; d+=25) camp.push(pt(d));
+  poliLinea(p,camp,'rgba(122,186,228,.8)',1.6,[8,5]);
+  // tacche a multipli di lato: cerchietto sulla linea, numero SOTTO, centrato,
+  // cosi' non finisce addosso alle etichette dei bersagli
+  for(let k=1;k<=3;k++){
+    const [a,b]=S2C(...proiettaPx(p,pt(k*lato)));
+    ctx.save();
+    ctx.strokeStyle='#7abae4'; ctx.lineWidth=1.6; ctx.fillStyle='rgba(8,6,4,.9)';
+    ctx.beginPath(); ctx.arc(a,b,4,0,7); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    testo(k+(k===1?' lato':' lati'), a, b+15, '#7abae4', 11, 'center');
+  }
+  // la distanza del bersaglio, calcolata invece che scritta a mano
+  const bp=BER[0], eb=EN(bp.lat,bp.lon);
+  const dist=(eb.E-no.E)*dx+(eb.N-no.N)*dy;
+  const [a,b]=S2C(...proiettaPx(p,pt(dist)));
+  ctx.save();
+  ctx.strokeStyle='#7abae4'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(a,b-11); ctx.lineTo(a,b+11); ctx.stroke();
+  ctx.restore();
+  testo(dist.toFixed(0)+' m = '+(dist/lato).toFixed(2)+' lati', a, b-21, '#7abae4', 11.5, 'center');
+}
+
+function disegnaBersagli(p){
+  const w=cv.clientWidth, h=cv.clientHeight;
+  const voci=[];
+  for(const b of BER){
+    const m=mondoB(b);
+    const [a,c]=S2C(...proiettaPx(p,m));
+    voci.push({b,a,c});
+  }
+  // ellissi prima di tutto, cosi' non coprono i mirini
+  for(const v of voci){
+    const el=S.mc&&S.mc.ell[v.b.id]; if(!el) continue;
+    const [ex,ey]=S2C(el.mx,el.my);
+    ctx.save(); ctx.translate(ex,ey); ctx.rotate(el.ang);
+    ctx.strokeStyle='rgba(212,105,79,.9)'; ctx.lineWidth=1.6; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.ellipse(0,0,el.a*S.vista.s,el.b*S.vista.s,0,0,7); ctx.stroke();
+    ctx.restore();
+  }
+  // mirini
+  for(const v of voci){
+    const primario = v.b.id==='piras';
+    const r = primario?13:8;
+    ctx.save();
+    ctx.strokeStyle = primario ? '#ffd97a' : 'rgba(255,217,122,.75)';
+    ctx.lineWidth = primario?2.4:1.6;
+    ctx.beginPath(); ctx.arc(v.a,v.c,r,0,7); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(v.a-r-7,v.c); ctx.lineTo(v.a-3,v.c);
+    ctx.moveTo(v.a+3,v.c);   ctx.lineTo(v.a+r+7,v.c);
+    ctx.moveTo(v.a,v.c-r-7); ctx.lineTo(v.a,v.c-3);
+    ctx.moveTo(v.a,v.c+3);   ctx.lineTo(v.a,v.c+r+7);
+    ctx.stroke();
+    if(primario){ ctx.fillStyle='#ffd97a'; ctx.beginPath(); ctx.arc(v.a,v.c,2.5,0,7); ctx.fill(); }
+    ctx.restore();
+  }
+  // etichette IMPILATE a lato, con linea di richiamo: i bersagli distano pochi
+  // pixel fra loro e le scritte, messe accanto, finivano una sopra l'altra
+  const cx=voci.reduce((s,v)=>s+v.a,0)/voci.length;
+  const cy=voci.reduce((s,v)=>s+v.c,0)/voci.length;
+  const aDestra = cx < w*0.6;
+  let bx = aDestra ? cx+70 : cx-70;
+  const passo=19;
+  let by = cy - (voci.length-1)*passo/2;
+  by = Math.max(24, Math.min(h-24-(voci.length-1)*passo, by));
+  ctx.save(); ctx.font='12px monospace';
+  const larg=Math.max(...voci.map(v=>ctx.measureText(v.b.nome).width))+14;
+  ctx.restore();
+  if(aDestra) bx=Math.min(bx, w-larg-12); else bx=Math.max(bx, larg+12);
+  voci.forEach((v,i)=>{
+    const y=by+i*passo;
+    const primario=v.b.id==='piras';
+    ctx.save();
+    ctx.strokeStyle= primario?'rgba(255,217,122,.75)':'rgba(255,217,122,.35)';
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(v.a,v.c); ctx.lineTo(bx + (aDestra?-8:8), y); ctx.stroke();
+    ctx.restore();
+    testo(v.b.nome, bx, y, primario?'#ffd97a':'#d8c39a', primario?13:12, aDestra?'left':'right');
+  });
+}
+
+function disegnaSegni(p){
+  const sosp=puntiSospetti(); const idSosp=sosp.length?sosp[0].p.id:null;
+  for(const c of CAT){
+    const s=S.segni[c.id]; if(!s) continue;
+    const [a,b]=S2C(s.u,s.v);
+    const attivo=S.usa[c.id];
+    ctx.save();
+    ctx.strokeStyle= attivo ? (c.t==='cima'?'#7fbf6a':'#d8b25a') : '#8a723a';
+    ctx.lineWidth=1.6;
+    ctx.beginPath(); ctx.moveTo(a-8,b); ctx.lineTo(a-2,b); ctx.moveTo(a+2,b); ctx.lineTo(a+8,b);
+    ctx.moveTo(a,b-8); ctx.lineTo(a,b-2); ctx.moveTo(a,b+2); ctx.lineTo(a,b+8); ctx.stroke();
+    if(S.sel===c.id){ ctx.setLineDash([2,3]); ctx.beginPath(); ctx.arc(a,b,12,0,7); ctx.stroke(); }
+    if(idSosp===c.id){
+      ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle='#d4694f'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(a,b,17,0,7); ctx.stroke();
+      ctx.restore(); testo('non torna',a,b+30,'#ff8a6a',12,'center');
+    }
+    if(S.appenaPosato===c.id){
+      ctx.setLineDash([]); ctx.strokeStyle='#7fbf6a'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(a,b,15,0,7); ctx.stroke();
+      testo(c.nome,a+20,b-3,'#8fd97a',13,'left');
+      testo('fissato',a+20,b+12,'#a2977f',10,'left');
+    }
+    ctx.restore();
+    // scarto: dal segno alla posizione riproiettata
+    if(p){
+      const [qa,qb]=S2C(...proiettaPx(p,mondo(c)));
+      const d=Math.hypot(qa-a,qb-b);
+      if(d>1.5){
+        ctx.save(); ctx.strokeStyle= attivo?'rgba(212,105,79,.9)':'rgba(106,169,212,.9)';
+        ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(a,b); ctx.lineTo(qa,qb); ctx.stroke();
+        ctx.beginPath(); ctx.arc(qa,qb,3,0,7); ctx.stroke(); ctx.restore();
+      }
+    }
+  }
+}
+
+function avvisoEscluso(){
+  const c=CAT.find(x=>x.id===S.escluso); if(!c) return;
+  const w=cv.clientWidth;
+  const testo=c.nome+': escluso dal calcolo, ma resta sulla foto \u2014 per cancellarlo usa la \u00d7';
+  ctx.save();
+  ctx.font='bold 12px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const larg=ctx.measureText(testo).width+34;
+  ctx.fillStyle='rgba(40,50,30,.95)'; ctx.fillRect((w-larg)/2,14,larg,32);
+  ctx.strokeStyle='#7fbf6a'; ctx.lineWidth=1.2; ctx.strokeRect((w-larg)/2+.5,14.5,larg-1,31);
+  ctx.fillStyle='#c2ddb6'; ctx.fillText(testo,w/2,31);
+  ctx.restore();
+}
+
+function avvisoAmbiguo(){
+  const w=cv.clientWidth;
+  const testo='Non riconosco questo spigolo con certezza \u2014 scegli tu la riga a sinistra';
+  ctx.save();
+  ctx.font='bold 13px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const larg=ctx.measureText(testo).width+34;
+  ctx.fillStyle='rgba(90,40,25,.95)'; ctx.fillRect((w-larg)/2,14,larg,32);
+  ctx.strokeStyle='#d4694f'; ctx.lineWidth=1.2; ctx.strokeRect((w-larg)/2+.5,14.5,larg-1,31);
+  ctx.fillStyle='#e8b9a8'; ctx.fillText(testo,w/2,31);
+  ctx.restore();
+}
+
+function invitoAPosare(){
+  if(!S.img) return;
+  const w=cv.clientWidth;
+  let testo;
+  if(S.sel && !S.segni[S.sel]){
+    const c=CAT.find(x=>x.id===S.sel); if(!c) return;
+    testo='Clicca dove vedi:  '+c.nome;
+  } else if(S.sol||S.approx){
+    testo='Clicca uno spigolo qualsiasi \u2014 lo strumento riconosce da solo quale \u00e8';
+  } else {
+    const id=prossimoDaPosare(); if(!id) return;
+    const c=CAT.find(x=>x.id===id);
+    testo='Clicca dove vedi:  '+c.nome;
+  }
+  ctx.save();
+  ctx.font='bold 13px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const larg=ctx.measureText(testo).width+34;
+  ctx.fillStyle='rgba(58,44,18,.94)';
+  ctx.fillRect((w-larg)/2, 14, larg, 32);
+  ctx.strokeStyle='#d8b25a'; ctx.lineWidth=1.2;
+  ctx.strokeRect((w-larg)/2+.5, 14.5, larg-1, 31);
+  ctx.fillStyle='#f2d38a';
+  ctx.fillText(testo, w/2, 31);
+  ctx.restore();
+}
+
+function avvisoBussola(){
+  const pt=puntiAttivi().filter(q=>q.piano);
+  const mon=new Set(pt.map(q=>q.gr)).size;
+  let righe;
+  if(pt.length<5 || mon<2)
+    righe=['Servono almeno CINQUE spigoli di base','di ALMENO DUE piramidi diverse.',
+           'Con quattro, un errore non si vedrebbe.'];
+  else
+    righe=['Gli spigoli non tornano fra loro.','Probabilmente ne hai scambiati due:',
+           'controlla che NE e SO non siano invertiti.'];
+  const h=cv.clientHeight;
+  ctx.save();
+  ctx.fillStyle='rgba(12,10,7,.86)';
+  ctx.fillRect(20,h-126,282,66);
+  ctx.strokeStyle=(pt.length<4||mon<2)?'#3a2f1a':'#d4694f';
+  ctx.strokeRect(20.5,h-125.5,281,65);
+  ctx.fillStyle=(pt.length<4||mon<2)?'#8a723a':'#d4694f';
+  ctx.font='10px monospace'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillText('BUSSOLA NON DISPONIBILE',32,h-108);
+  ctx.fillStyle='#a2977f';
+  righe.forEach((r,i)=>ctx.fillText(r,32,h-93+i*14));
+  ctx.restore();
+}
+
+function bussolaAffidabile(){
+  // La bussola si mostra solo se l'orientamento NON puo' essere girato senza accorgersene.
+  // Con una piramide sola, scambiare NE con SO da' una soluzione perfetta e un nord a 90
+  // gradi: il residuo resta zero e nessun numero ti avverte. Serve un secondo monumento,
+  // perche' la distanza fra due piramidi e' fissata dalle coordinate e non si lascia ruotare.
+  const p = S.sol ? S.sol.p : S.approx;
+  if(!p) return null;
+  const pt = puntiAttivi().filter(q=>q.piano);
+  // CINQUE, non quattro. L'omografia ha 8 gradi di liberta' e ogni punto ne fissa 2:
+  // con quattro punti il sistema e' esattamente determinato, il residuo e' zero PER
+  // COSTRUZIONE, e il controllo sul residuo qui sotto non puo' bocciare niente.
+  // Serve almeno un punto in avanzo, altrimenti un'assegnazione sbagliata degli
+  // spigoli passa liscia e la bussola indica con sicurezza una direzione falsa.
+  if(pt.length<5) return null;
+  if(new Set(pt.map(q=>q.gr)).size<2) return null;
+  let mx=0,my=0; pt.forEach(q=>{mx+=q.X;my+=q.Y;}); mx/=pt.length; my/=pt.length;
+  let sxx=0,syy=0,sxy=0;
+  pt.forEach(q=>{const a=q.X-mx,b=q.Y-my;sxx+=a*a;syy+=b*b;sxy+=a*b;});
+  const tr=sxx+syy, rad=Math.sqrt(Math.max(0,tr*tr/4-(sxx*syy-sxy*sxy)));
+  const l1=tr/2+rad, l2=tr/2-rad;
+  if(!(l1>0) || Math.sqrt(l2/l1) < 0.10) return null;
+  let s2=0, r2=0, iu=0, iv=0;
+  pt.forEach(q=>{iu+=q.u;iv+=q.v;}); iu/=pt.length; iv/=pt.length;
+  for(const q of pt){
+    const [u,v]=proj(p,q.X,q.Y,q.Z);
+    s2+=(u-q.u)**2+(v-q.v)**2; r2+=(q.u-iu)**2+(q.v-iv)**2;
+  }
+  if(!(Math.sqrt(s2/Math.max(r2,1e-12)) < 0.05)) return null;
+  return {p, esatta:!!S.sol};
+}
+
+function disegnaBussola(){
+  const bs=bussolaAffidabile(); if(!bs) return;
+  const p=bs.p, esatta=bs.esatta;
+  let m=null, sottoIlDito=false;
+  if(S.mouse && S.mouse.x>=0 && S.mouse.y>=0 &&
+     S.mouse.x<=cv.clientWidth && S.mouse.y<=cv.clientHeight){
+    const [iu,iv]=C2S(S.mouse.x,S.mouse.y);
+    if(iu>=0&&iv>=0&&iu<=S.img.width&&iv<=S.img.height){
+      m=mondoDaPixel(p,iu,iv,0); sottoIlDito=!!m;
+    }
+  }
+  if(!m) m=baricentroMondo();
+  if(!m) return;
+  const v=versoNord(p,m); if(!v) return;
+
+  const h=cv.clientHeight;
+  const R=52, cx=R+30, cy=h-R-72;
+
+  // fondo pieno: sopra la sabbia chiara una rosa trasparente non si legge
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,R+15,0,7);
+  ctx.fillStyle='rgba(8,6,4,.90)'; ctx.fill();
+  ctx.strokeStyle= esatta?'#6b5a2e':'#4a3a1e'; ctx.lineWidth=1;
+  ctx.stroke();
+  ctx.restore();
+
+  // quadranti chiari/scuri, cosi' l'orientamento si coglie senza leggere le lettere
+  const angN=Math.atan2(v.n[1],v.n[0]);
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(cx,cy);
+  ctx.arc(cx,cy,R,angN-Math.PI/4,angN+Math.PI/4); ctx.closePath();
+  ctx.fillStyle='rgba(255,217,122,.13)'; ctx.fill();
+  ctx.restore();
+
+  // cerchio graduato
+  ctx.save();
+  ctx.strokeStyle='rgba(216,178,90,.35)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+  for(let k=0;k<24;k++){
+    const t=angN + k*Math.PI/12;
+    const lungo = (k%6===0);
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(t)*(R-(lungo?9:4)), cy+Math.sin(t)*(R-(lungo?9:4)));
+    ctx.lineTo(cx+Math.cos(t)*R, cy+Math.sin(t)*R);
+    ctx.strokeStyle= lungo?'rgba(216,178,90,.75)':'rgba(216,178,90,.3)';
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // AGO: meta' nord piena e appuntita, meta' sud sottile. Prima erano quattro
+  // raggi uguali e non si capiva da che parte fosse il nord.
+  const nx=Math.cos(angN), ny=Math.sin(angN);
+  ctx.save();
+  ctx.strokeStyle='rgba(180,150,90,.85)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx-nx*(R-14), cy-ny*(R-14)); ctx.stroke();
+  const pta=[cx+nx*(R-6), cy+ny*(R-6)];
+  const px1=[cx+ -ny*7 , cy+ nx*7], px2=[cx+ ny*7, cy - nx*7];
+  ctx.beginPath();
+  ctx.moveTo(pta[0],pta[1]); ctx.lineTo(px1[0],px1[1]); ctx.lineTo(px2[0],px2[1]); ctx.closePath();
+  ctx.fillStyle='#ffd97a'; ctx.fill();
+  ctx.strokeStyle='rgba(8,6,4,.9)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,3.5,0,7); ctx.fillStyle='#ffd97a'; ctx.fill();
+  ctx.restore();
+
+  // lettere fuori dal cerchio
+  const assi=[[v.n,'N',1],[[-v.n[0],-v.n[1]],'S',0],[v.e,'E',0],[[-v.e[0],-v.e[1]],'O',0]];
+  for(const [d,eti,forte] of assi)
+    testo(eti, cx+d[0]*(R+9), cy+d[1]*(R+9), forte?'#ffd97a':'#c9bda4', forte?14:12, 'center');
+
+  // lettura sotto, su fondo pieno e allineata a sinistra
+  const righe=[];
+  righe.push([esatta?'nord calcolato':'NORD PROVVISORIO', esatta?'#8fd97a':'#ff8a6a']);
+  if(sottoIlDito){
+    const E=m.X*S.SW, N=m.Y*S.SW, ll=LL(E,N);
+    const dd=Math.hypot(E,N); let az=Math.atan2(E,N)*180/Math.PI; if(az<0)az+=360;
+    righe.push([ll.lat.toFixed(5)+'  '+ll.lon.toFixed(5), '#e8dcc0']);
+    righe.push([dd.toFixed(0)+' m da Cheope  \u00b7  az '+az.toFixed(0)+'\u00b0', '#c9bda4']);
+  } else righe.push(['muovi il mouse sulla foto','#8a723a']);
+  const bw=250, bh=righe.length*16+10;
+  ctx.save();
+  ctx.fillStyle='rgba(8,6,4,.90)'; ctx.fillRect(14, cy+R+20, bw, bh);
+  ctx.strokeStyle='#3a2f1a'; ctx.lineWidth=1; ctx.strokeRect(14.5, cy+R+20.5, bw-1, bh-1);
+  ctx.restore();
+  righe.forEach((r,i)=>testo(r[0], 24, cy+R+30+i*16, r[1], 11.5, 'left'));
+}
+
+function disegnaMirino(){
+  if(!S.img) return;
+  const m=S.mouse;
+  ctx.save();
+  ctx.strokeStyle='rgba(216,178,90,.9)'; ctx.lineWidth=1.2;
+  ctx.beginPath();
+  ctx.moveTo(m.x-12,m.y); ctx.lineTo(m.x-4,m.y); ctx.moveTo(m.x+4,m.y); ctx.lineTo(m.x+12,m.y);
+  ctx.moveTo(m.x,m.y-12); ctx.lineTo(m.x,m.y-4); ctx.moveTo(m.x,m.y+4); ctx.lineTo(m.x,m.y+12);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function disegnaLente(){
+  const m=S.mouse;
+  const fatt = parseFloat(($('#lenteF')||{}).value) || 4;
+  // l'ingrandimento e' RELATIVO a quello che stai gia' vedendo: 4x significa
+  // "quattro volte piu' grande della tela". Oltre 12x dei pixel veri c'e' solo grana.
+  const ing = Math.max(1.2, Math.min(fatt*S.vista.s, 12));
+  const R=98;
+  const w=cv.clientWidth, h=cv.clientHeight;
+  // POSIZIONE FISSA, in basso a destra. Prima la lente inseguiva il puntatore e
+  // rimbalzava dall'altra parte vicino ai bordi: quel salto rendeva impossibile
+  // posare un punto. Ora sta ferma; quello che si muove e' solo cio' che mostra.
+  const lx = w - R - 20, ly = h - R - 20;
+  // se ci passi sopra col puntatore, sbiadisce invece di scappare
+  const vicino = Math.hypot(m.x-lx, m.y-ly) < R+26;
+  const [iu,iv]=C2S(m.x,m.y);
+  const dentro = iu>=0 && iv>=0 && iu<=S.img.width && iv<=S.img.height;
+  ctx.save();
+  if(vicino) ctx.globalAlpha=0.22;
+  ctx.beginPath(); ctx.arc(lx,ly,R,0,7); ctx.clip();
+  ctx.fillStyle='#0c0a07'; ctx.fillRect(lx-R,ly-R,2*R,2*R);
+  if(dentro){
+    // solo il quadratino che serve: prima ridisegnavo tutti i 15 milioni di pixel,
+    // scalati, per poi ritagliarne un cerchio da 190. Da qui l'impressione che la
+    // lente non seguisse il puntatore: non era in ritardo, era il disegno a arrancare.
+    ctx.imageSmoothingEnabled = ing<2.5;
+    const mezzo=R/ing;
+    ctx.drawImage(S.img, iu-mezzo, iv-mezzo, 2*mezzo, 2*mezzo, lx-R, ly-R, 2*R, 2*R);
+  }
+  ctx.restore();
+  if(!dentro){
+    ctx.save(); ctx.globalAlpha=vicino?0.22:1;
+    ctx.fillStyle='#8a723a'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText('fuori dalla foto',lx,ly+4); ctx.restore();
+  }
+  ctx.save();
+  if(vicino) ctx.globalAlpha=0.22;
+  // mirino esattamente dove cadra' il clic
+  ctx.strokeStyle='#d8b25a'; ctx.lineWidth=1.2;
+  ctx.beginPath();
+  ctx.moveTo(m.x-11,m.y); ctx.lineTo(m.x-3,m.y); ctx.moveTo(m.x+3,m.y); ctx.lineTo(m.x+11,m.y);
+  ctx.moveTo(m.x,m.y-11); ctx.lineTo(m.x,m.y-3); ctx.moveTo(m.x,m.y+3); ctx.lineTo(m.x,m.y+11);
+  ctx.stroke();
+  ctx.beginPath(); ctx.arc(m.x,m.y,2,0,7); ctx.stroke();
+  ctx.restore();
+  ctx.save();
+  if(vicino) ctx.globalAlpha=0.22;
+  ctx.strokeStyle='#d8b25a'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(lx,ly,R,0,7); ctx.stroke();
+  ctx.strokeStyle='rgba(216,178,90,.9)'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(lx-R,ly); ctx.lineTo(lx-9,ly); ctx.moveTo(lx+9,ly); ctx.lineTo(lx+R,ly);
+  ctx.moveTo(lx,ly-R); ctx.lineTo(lx,ly-9); ctx.moveTo(lx,ly+9); ctx.lineTo(lx,ly+R);
+  ctx.stroke();
+  ctx.fillStyle='#8a723a'; ctx.font='9px monospace'; ctx.textAlign='center';
+  ctx.fillText('sotto il puntatore \u00b7 '+ing.toFixed(1)+'\u00d7',lx,ly+R+13);
+  ctx.restore();
+}
+
+/* ---------- 9. PANNELLI ---------- */
+function disegnaElenco(){
+  const el=$('#elenco'); el.innerHTML='';
+  let gr=null;
+  for(const c of CAT){
+    if(c.gr!==gr){gr=c.gr; const d=document.createElement('div');d.className='gruppo';d.textContent=gr;el.appendChild(d);}
+    const r=document.createElement('div');
+    r.className='riga'+(S.sel===c.id?' sel':'')+(S.segni[c.id]?' posato':'');
+    const cb=document.createElement('input');
+    cb.type='checkbox';
+    const posato=!!S.segni[c.id];
+    cb.checked = posato && !!S.usa[c.id];
+    cb.disabled = !posato;
+    cb.title = posato ? 'usa questo punto nel calcolo' : 'punto non ancora posato sulla foto';
+    if(!posato) cb.style.opacity='.25';
+    cb.onclick=e=>{e.stopPropagation();S.usa[c.id]=cb.checked;
+      if(!cb.checked){S.escluso=c.id;setTimeout(()=>{S.escluso=null;disegna();},2600);}
+      ricalcola();};
+    const n=document.createElement('span'); n.className='nome'; n.textContent=c.nome;
+    const pin=document.createElement('span'); pin.className='pin';
+    pin.textContent = S.segni[c.id] ? (c.t==='cima'?'▲':'✛') : '·';
+    pin.style.color = S.segni[c.id] ? (c.t==='cima'?'#7fbf6a':'#d8b25a') : '#5a4a2a';
+    const res=document.createElement('span'); res.className='res';
+    if(S.res[c.id]!==undefined){
+      const l=S.loo[c.id];
+      res.textContent = S.res[c.id].toFixed(1)+(l!==undefined?'/'+l.toFixed(0):'');
+      res.title='scarto di adattamento / scarto lasciando fuori questo punto (px)';
+      res.style.color = S.res[c.id]>8?'#d4694f':'#7fbf6a';
+    }
+    r.append(cb,n,pin,res);
+    if(S.segni[c.id]){
+      const x=document.createElement('span');
+      x.textContent='\u00d7'; x.title='cancella questo punto';
+      x.style.cssText='width:14px;text-align:center;color:#8a723a;font-size:14px;cursor:pointer';
+      x.onmouseenter=()=>x.style.color='#d4694f';
+      x.onmouseleave=()=>x.style.color='#8a723a';
+      x.onclick=e=>{e.stopPropagation(); delete S.segni[c.id]; S.usa[c.id]=true;
+                    if(S.sel===c.id)S.sel=null; ricalcola();};
+      r.append(x);
+    }
+    r.onclick=()=>{S.sel=(S.sel===c.id?null:c.id);disegnaElenco();disegna();};
+    r.oncontextmenu=e=>{e.preventDefault(); delete S.segni[c.id]; if(S.sel===c.id)S.sel=null; ricalcola();};
+    el.appendChild(r);
+  }
+}
+
+function mostraEsito(){
+  const t=$('#esito'), g=$('#giudizio');
+  if(!S.sol){
+    const n=Object.keys(S.segni).filter(k=>S.usa[k]).length;
+    const posati=Object.keys(S.segni).length;
+    t.innerHTML = posati===0
+      ? `<tr><td class="nota"><b>Nessun punto posato.</b> Le spunte a sinistra non bastano: servono per decidere quali punti entrano nel calcolo. Per posare un punto <b>clicca la sua riga nell'elenco, poi clicca sulla foto</b> dove lo vedi.</td></tr>`
+      : `<tr><td class="nota">Punti posati: ${posati}. Ne servono almeno 4 di suolo, meglio 6.</td></tr>`;
+    g.innerHTML=''; return;
+  }
+  const pt=puntiAttivi();
+  const rms=Math.sqrt(pt.reduce((s,q)=>s+S.res[q.id]**2,0)/pt.length);
+  const loov=Object.values(S.loo);
+  const looR=loov.length?Math.sqrt(loov.reduce((s,x)=>s+x*x,0)/loov.length):null;
+  const C=centroCamera(S.sol.p);
+  const mPras=mondoB(BER[0]);
+  const mpx=scalaMetri(S.sol.p,mPras);
+  let r=[];
+  r.push(['punti nel calcolo', `${S.sol.nSuolo} suolo + ${S.sol.nAlti} cime`]);
+  r.push(['modello', S.sol.modo==='completo'?'camera completa (con quote)':'solo piano (quote non corrette)']);
+  r.push(['scarto di adattamento', rms.toFixed(1)+' px']);
+  if(looR!==null) r.push(['scarto lasciando fuori uno', looR.toFixed(1)+' px']);
+  if(isFinite(mpx)) r.push(['scala al bersaglio', mpx.toFixed(2)+' m/px']);
+  const cq=confrontoQuota();
+  if(cq) r.push(['quota dichiarata dall\u2019archivio',
+    cq.dich.toFixed(0)+' m \u2014 calcolata '+cq.alt.toFixed(0)+' m ('+(cq.scarto>0?'+':'')+cq.scarto.toFixed(0)+'%)']);
+  if(C){
+    const alt=C[2]*S.SW, e=C[0]*S.SW, n=C[1]*S.SW;
+    const dist=Math.hypot(e,n);
+    let az=Math.atan2(e,n)*180/Math.PI; if(az<0)az+=360;
+    r.push(['quota della camera', alt.toFixed(0)+' m sul piano']);
+    r.push(['posizione della camera', dist.toFixed(0)+' m a '+az.toFixed(1)+'° da Cheope']);
+    const ll=LL(e,n);
+    r.push(['&nbsp;', ll.lat.toFixed(5)+' / '+ll.lon.toFixed(5)]);
+  }
+  t.innerHTML=r.map(x=>`<tr><td>${x[0]}</td><td class="v">${x[1]}</td></tr>`).join('');
+
+  let msg='';
+  if(S.fattoreRis>2)
+    msg+=`<div class="avviso"><b>La foto è troppo piccola.</b> Le prove del motore sono state fatte su ${'4961'} px di lato: qui ne hai ${Math.round(4961/S.fattoreRis)}, cioè ${S.fattoreRis.toFixed(1)} volte meno. L'incertezza sul bersaglio cresce nella stessa proporzione — dai ±13 m del pieno formato si va verso ±${Math.round(13*S.fattoreRis)} m, e il dosso è lungo 94 m. Scarica dalla pagina di Commons il file originale, non l'anteprima.</div>`;
+  const suolo=pt.filter(q=>q.piano);
+  if(suolo.length===4)
+    msg+=`<div class="avviso">Quattro punti fissano esattamente gli otto gradi di liberta' del calcolo: <b>non c'e' niente in avanzo</b>, quindi lo scarto e' zero comunque, anche se hai scambiato due spigoli. Il quinto punto e' il primo che puo' smentirti.</div>`;
+  if(suolo.length>=4 && new Set(suolo.map(q=>q.gr)).size<2)
+    msg+=`<div class="avviso">Tutti i tuoi spigoli stanno su <b>una sola piramide</b>. Se hai scambiato NE con SO, la soluzione resta perfetta e il bersaglio finisce dall'altra parte, senza che nessun numero lo segnali. Posa qualche spigolo di una seconda piramide: le due si ancorano a vicenda.</div>`;
+  if(pt.length===4)
+    msg+=`<div class="avviso">Con quattro punti l'adattamento è <b>esatto per costruzione</b>: lo scarto di 0 px non dice niente sulla qualità, perché non c'è nulla in avanzo da smentirlo. Nelle prove su camera finta, quattro spigoli soli hanno sbagliato il bersaglio di decine di metri. Posane almeno sei.</div>`;
+  if(S.sol.modo==='piano')
+    msg+=`<div class="avviso">Nessuna correzione di quota: servono almeno due <b>cime</b> di piramide fra i punti. Senza, un dislivello di 14 m fra Cheope e il dosso si traduce in un errore che cresce con la distanza dal punto sotto la camera.</div>`;
+  if(looR!==null && looR>3*rms)
+    msg+=`<div class="avviso">Lo scarto lasciando fuori un punto è ${(looR/rms).toFixed(1)} volte quello di adattamento: la soluzione si appoggia troppo a pochi punti. Aggiungine altri, meglio se lontani fra loro.</div>`;
+  if(rms<3 && looR!==null && looR<6)
+    msg+=`<div class="avviso buono">Adattamento buono. Il bersaglio resta però <b>fuori</b> dal recinto dei punti di appoggio: guarda l'ellisse di incertezza prima di credere alla crocetta.</div>`;
+  // punti tenuti fuori = prova indipendente
+  const fuori=CAT.filter(c=>S.segni[c.id]&&!S.usa[c.id]);
+  if(fuori.length){
+    let f='<div class="tacca" style="margin-top:8px">Prova indipendente</div><table class="esito">';
+    for(const c of fuori){
+      const [a,b]=proiettaPx(S.sol.p,mondo(c)), s=S.segni[c.id];
+      const dpx=Math.hypot(a-s.u,b-s.v), mp=scalaMetri(S.sol.p,mondo(c));
+      f+=`<tr><td>${c.nome}</td><td class="v">${dpx.toFixed(1)} px · ${(dpx*mp).toFixed(0)} m</td></tr>`;
+    }
+    g.innerHTML=msg+f+'</table>';
+  } else g.innerHTML=msg;
+}
+
+function mostraBersagli(){
+  const el=$('#bersagli');
+  if(!S.sol){el.innerHTML='<div class="nota">Nessuna soluzione.</div>';return;}
+  let h='<table class="esito">';
+  for(const b of BER){
+    const m=mondoB(b);
+    const [a,c]=proiettaPx(S.sol.p,m);
+    const dentro = S.img ? (a>=0&&c>=0&&a<=S.img.width&&c<=S.img.height) : true;
+    h+=`<tr><td>${b.nome}</td><td class="v" style="color:${dentro?'#f2d38a':'#8a723a'}">
+      ${a.toFixed(0)}, ${c.toFixed(0)} px${dentro?'':' · fuori'}</td></tr>`;
+  }
+  h+='</table><div class="nota">Coordinate in pixel dell\'immagine originale. "Fuori" vuol dire che quel punto non è nell\'inquadratura.</div>';
+  el.innerHTML=h;
+}
+
+function mostraMC(){
+  const el=$('#esitoMC');
+  if(!S.mc){el.innerHTML='';return;}
+  let h=`<table class="esito"><tr><td colspan="2" class="nota">Ellisse al 95% su ${S.mc.n} estrazioni.</td></tr>`;
+  for(const b of BER){
+    const e=S.mc.ell[b.id]; if(!e) continue;
+    const mp=scalaMetri(S.sol.p,mondoB(b));
+    h+=`<tr><td>${b.nome}</td><td class="v">±${(e.a*mp).toFixed(0)} × ${(e.b*mp).toFixed(0)} m</td></tr>`;
+  }
+  h+=`</table><div class="nota">È l'incertezza dovuta <b>solo</b> alla mano che clicca. Vanno sommati a parte, e non li vede nessuno scarto:
+  <br>· errore delle coordinate di partenza: <b>2–5 m</b>
+  <br>· quota della base di Chefren sbagliata di 5 m: <b>~9 m</b> sul bersaglio (questo però si vede: lo scarto di adattamento sale)
+  <br>· quota del <b>dosso</b> sbagliata di 5 m: <b>~9 m</b> sul bersaglio, e lo scarto resta a zero. È l'errore invisibile: se nel 1904 il terreno lì era più basso di oggi, la crocetta è fuori posto e nessun numero te lo dice.</div>`;
+  el.innerHTML=h;
+}
+
+
+/* ---------- CAMERA OSCURA ----------
+   Solo rimappatura dei livelli: una tabella di conversione applicata a ogni pixel.
+   Nessun filtro che inventi struttura (niente nitidezza, niente ricostruzione):
+   uno sharpening produce aloni ai bordi, e un alone su una lastra granulosa
+   diventa un contorno che non esiste. Qui l'operazione e' reversibile e dichiarata. */
+S.oscura={attiva:false, nero:0, bianco:255, gamma:1, rotta:false};
+
+function tabellaOscura(){
+  const {nero,bianco,gamma}=S.oscura;
+  const t=new Uint8Array(256), amp=Math.max(1,bianco-nero);
+  for(let i=0;i<256;i++){
+    let v=(i-nero)/amp;
+    v=v<0?0:v>1?1:v;
+    t[i]=Math.round(Math.pow(v,gamma)*255);
+  }
+  return t;
+}
+
+function applicaOscura(){
+  if(!S.oscura.attiva || S.oscura.rotta) return;
+  const d=window.devicePixelRatio||1;
+  const w=Math.round(cv.clientWidth*d), h=Math.round(cv.clientHeight*d);
+  if(w<1||h<1) return;
+  try{
+    const id=ctx.getImageData(0,0,w,h), p=id.data, t=tabellaOscura();
+    for(let i=0;i<p.length;i+=4){ p[i]=t[p[i]]; p[i+1]=t[p[i+1]]; p[i+2]=t[p[i+2]]; }
+    ctx.putImageData(id,0,0);
+  }catch(e){
+    S.oscura.rotta=true;
+    $('#ozInfo').innerHTML='<b>La camera oscura non funziona qui.</b> Il browser blocca la lettura dei pixel della tela. Apri lo strumento dal sito invece che dal file locale.';
+  }
+}
+
+// finestra automatica: prende il 2% e il 98% dei livelli VISIBILI, cosi' il
+// contrasto si apre senza saturare. E' una scelta dichiarata, non un'ottimizzazione
+function finestraAutomatica(){
+  if(!S.img){
+    $('#ozInfo').innerHTML='<b>Prima apri una foto.</b> Senza immagine la tela \u00e8 nera e la finestra verrebbe calcolata sul nulla.';
+    return;
+  }
+  const d=window.devicePixelRatio||1;
+  const w=Math.round(cv.clientWidth*d), h=Math.round(cv.clientHeight*d);
+  const era=S.oscura.attiva; S.oscura.attiva=false; disegna();
+  let id;
+  try{ id=ctx.getImageData(0,0,w,h); }
+  catch(e){ S.oscura.attiva=era; S.oscura.rotta=true; disegna(); return; }
+  const ist=new Float64Array(256), p=id.data;
+  for(let i=0;i<p.length;i+=4) ist[p[i]]++;
+  let tot=0; for(let i=0;i<256;i++) tot+=ist[i];
+  let acc=0, lo=0, hi=255;
+  for(let i=0;i<256;i++){ acc+=ist[i]; if(acc>=tot*0.02){lo=i;break;} }
+  acc=0;
+  for(let i=255;i>=0;i--){ acc+=ist[i]; if(acc>=tot*0.02){hi=i;break;} }
+  if(hi-lo<12){
+    // finestra degenere: la zona inquadrata e' quasi tutta di un tono solo.
+    // Aprirla comunque significa trasformare il rumore in bianco e nero pieni.
+    S.oscura.attiva=era; $('#cbOscura').checked=era; disegna();
+    $('#ozInfo').innerHTML='<b>Qui non c\u2019\u00e8 contrasto da aprire.</b> I livelli visibili stanno tutti fra '+lo+' e '+hi+
+      ': forzare la finestra non farebbe emergere niente, trasformerebbe la grana in bianco e nero pieni. Sposta la vista su una zona con piu\u2019 tono.';
+    return;
+  }
+  S.oscura.nero=lo; S.oscura.bianco=hi; S.oscura.attiva=true;
+  $('#ozNero').value=lo; $('#ozBianco').value=hi; $('#cbOscura').checked=true;
+  $('#ozInfo').textContent='Livelli visibili fra '+lo+' e '+hi+' su 255: la finestra apre il contrasto di '+
+    (255/Math.max(1,hi-lo)).toFixed(1)+' volte. Fuori da questa finestra i valori sono tagliati.';
+  disegna();
+}
+
+/* ---------- PROVINO CIECO ----------
+   Il bersaglio e otto zone di controllo prese a caso alla stessa distanza dalla
+   camera, trattate in modo identico e mescolate. Se il bersaglio non si riconosce
+   fra i controlli, cio' che sembrava una struttura era rumore.
+   E' l'unico modo onesto di guardare una foto al limite della sua risoluzione. */
+function ritaglia(px,py,latoPx,dest){
+  const c=document.createElement('canvas');
+  c.width=dest; c.height=dest;
+  const x=c.getContext('2d');
+  x.imageSmoothingEnabled=false;
+  x.fillStyle='#000'; x.fillRect(0,0,dest,dest);
+  x.drawImage(S.img, px-latoPx/2, py-latoPx/2, latoPx, latoPx, 0,0,dest,dest);
+  if(S.oscura.attiva && !S.oscura.rotta){
+    try{
+      const id=x.getImageData(0,0,dest,dest), p=id.data, t=tabellaOscura();
+      for(let i=0;i<p.length;i+=4){ p[i]=t[p[i]]; p[i+1]=t[p[i+1]]; p[i+2]=t[p[i+2]]; }
+      x.putImageData(id,0,0);
+    }catch(e){}
+  }
+  return c;
+}
+
+function apriProvino(){
+  if(!S.img || !S.sol){ alert('Serve una foto risolta.'); return; }
+  const p=S.sol.p, b=BER[0], mb=mondoB(b);
+  const pb=proiettaPx(p,mb), mpx=scalaMetri(p,mb);
+  if(!isFinite(mpx)||mpx<=0){ alert('Scala non calcolabile.'); return; }
+  const LATO_M=160;                       // il dosso e' 94 m: ci sta comodo
+  const latoPx=LATO_M/mpx;
+  const C=centroCamera(p);
+  const distBers=C?Math.hypot(mb.X-C[0],mb.Y-C[1],mb.Z-C[2]):null;
+  const zone=[{px:pb[0],py:pb[1],vero:true}];
+  // controlli: punti a caso in un anello attorno al bersaglio, stessa quota,
+  // scartati se cadono su una piramide, fuori inquadratura o troppo vicini fra loro
+  const evita=CAT.filter(c=>c.t==='suolo').map(c=>proiettaPx(p,mondo(c)));
+  let tent=0;
+  while(zone.length<9 && tent++<4000){
+    const ang=Math.random()*2*Math.PI, r=(220+Math.random()*900)/S.SW;
+    const m={X:mb.X+Math.cos(ang)*r, Y:mb.Y+Math.sin(ang)*r, Z:mb.Z};
+    const q=proiettaPx(p,m);
+    if(q[0]<latoPx || q[1]<latoPx || q[0]>S.img.width-latoPx || q[1]>S.img.height-latoPx) continue;
+    if(distBers){
+      const dd=Math.hypot(m.X-C[0],m.Y-C[1],m.Z-C[2]);
+      if(Math.abs(dd-distBers)/distBers>0.25) continue;   // stessa distanza, stessa grana
+    }
+    if(evita.some(e=>Math.hypot(e[0]-q[0],e[1]-q[1])<latoPx*0.9)) continue;
+    if(zone.some(z=>Math.hypot(z.px-q[0],z.py-q[1])<latoPx*0.9)) continue;
+    zone.push({px:q[0],py:q[1],vero:false});
+  }
+  if(zone.length<5){ alert('Non trovo abbastanza zone di controllo dentro la foto.'); return; }
+  for(let i=zone.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [zone[i],zone[j]]=[zone[j],zone[i]]; }
+  S.provino={zone, scelta:null, rivelato:false};
+  const g=$('#provinoGriglia'); g.innerHTML='';
+  zone.forEach((z,i)=>{
+    const box=document.createElement('div');
+    box.style.cssText='border:2px solid #3a2f1a;border-radius:4px;padding:4px;cursor:pointer;background:#0e0b07';
+    const c=ritaglia(z.px,z.py,latoPx,210);
+    c.style.cssText='width:100%;display:block;image-rendering:pixelated';
+    const et=document.createElement('div');
+    et.textContent=(i+1);
+    et.style.cssText='font:11px monospace;color:#8a723a;text-align:center;padding-top:3px';
+    box.append(c,et);
+    box.onclick=()=>{
+      if(S.provino.rivelato) return;
+      S.provino.scelta=i;
+      [...g.children].forEach((x,k)=>x.style.borderColor = k===i?'#d8b25a':'#3a2f1a');
+    };
+    g.appendChild(box);
+  });
+  $('#provinoTesto').textContent=LATO_M+' m di lato \u00b7 '+mpx.toFixed(2)+
+    ' m/px \u00b7 '+(S.oscura.attiva?'camera oscura attiva':'nessun filtro');
+  $('#provinoEsito').innerHTML='Uno di questi \u00e8 il punto calcolato. Gli altri sono deserto preso a caso alla stessa distanza. <b>Scegli quello che ti sembra contenga un rilievo</b>, poi premi Rivela.';
+  $('#provino').style.display='block';
+}
+
+function rivelaProvino(){
+  const pr=S.provino; if(!pr||pr.rivelato) return;
+  pr.rivelato=true;
+  const g=$('#provinoGriglia');
+  const vero=pr.zone.findIndex(z=>z.vero);
+  [...g.children].forEach((x,k)=>{
+    x.style.borderColor = pr.zone[k].vero ? '#7fbf6a' : (k===pr.scelta?'#d4694f':'#3a2f1a');
+    x.lastChild.textContent = (k+1)+(pr.zone[k].vero?'  \u2190 bersaglio':'');
+    x.lastChild.style.color = pr.zone[k].vero?'#7fbf6a':'#8a723a';
+  });
+  const n=pr.zone.length;
+  let msg;
+  if(pr.scelta===null) msg='Non hai scelto. Il bersaglio era il numero '+(vero+1)+'.';
+  else if(pr.scelta===vero)
+    msg='<b>Hai indovinato.</b> Da solo non basta: con '+n+' riquadri il caso ci azzecca una volta su '+n+
+        ' ('+(100/n).toFixed(0)+'%). Per contare, va ripetuto piu\u2019 volte, o fatto scegliere a qualcuno che non sa dove sia il punto.';
+  else
+    msg='<b>Hai scelto il numero '+(pr.scelta+1)+', il bersaglio era il '+(vero+1)+'.</b> Vuol dire che il punto calcolato non si distingue dal deserto qualunque: quello che sembrava una struttura era grana. \u00c8 un risultato, non un fallimento \u2014 e va scritto nel libro come tale.';
+  $('#provinoEsito').innerHTML=msg;
+}
+
+
+/* ---------- SCHEDA DELLA FOTOGRAFIA ----------
+   Una fotografia usata come prova va citata come si cita un documento: archivio,
+   segnatura, autore, data, diritti. Senza questi, il rilievo non e' verificabile
+   da nessun altro. I dati viaggiano nella scheda JSON e finiscono stampati nel PNG. */
+const FOTOTECA=[
+ {chiave:/EAD.?WEHR.?32044.?B/i, dati:{
+   archivio:'Schweizerische Nationalbibliothek NB, Bern \u2014 Sammlung Eduard Spelterini',
+   segnatura:'CH-NB / EAD-WEHR-32044-B',
+   autore:'Eduard Spelterini',
+   data:'21 novembre 1904',
+   quota:600,
+   licenza:'Dominio pubblico',
+   url:'commons.wikimedia.org \u2014 CH-NB Photoglob-Wehrli EAD-WEHR-32044-B.tiff',
+   didascalia:'Pyramiden von Gizeh bei Kairo aus ca. 600 m H\u00f6he, Ballonaufnahme'}},
+ {chiave:/LBS.?MH02.?07/i, dati:{
+   archivio:'ETH-Bibliothek Z\u00fcrich, Bildarchiv \u2014 Kilimanjaroflug 1929/30',
+   segnatura:'LBS_MH02-07',
+   autore:'Walter Mittelholzer',
+   data:'1929\u20131930',
+   quota:400,
+   licenza:'Dominio pubblico',
+   url:'ba.e-pics.ethz.ch',
+   didascalia:'Pyramiden von Gizeh aus 400 m H\u00f6he'}},
+ {chiave:/matpc/i, dati:{
+   archivio:'Library of Congress \u2014 Matson Photograph Collection',
+   segnatura:'LC-DIG-matpc',
+   autore:'American Colony Photo Department',
+   data:'1930 ca.',
+   quota:null,
+   licenza:'Nessuna restrizione nota',
+   url:'loc.gov/pictures/collection/matpc',
+   didascalia:''}}
+];
+const CAMPI={archivio:'fArchivio',segnatura:'fSegnatura',autore:'fAutore',
+             data:'fData',quota:'fQuota',licenza:'fLicenza',url:'fUrl'};
+S.foto={archivio:'',segnatura:'',autore:'',data:'',quota:null,licenza:'',url:'',didascalia:''};
+
+function scriviScheda(){
+  for(const k in CAMPI){ const el=$('#'+CAMPI[k]); if(el) el.value = S.foto[k]==null?'':S.foto[k]; }
+  notaScheda();
+}
+function leggiSchedaFoto(){
+  for(const k in CAMPI){
+    const el=$('#'+CAMPI[k]); if(!el) continue;
+    S.foto[k] = (k==='quota') ? (el.value===''?null:parseFloat(el.value)) : el.value;
+  }
+  notaScheda(); mostraEsito();
+}
+function notaScheda(){
+  const n=$('#fNota'); if(!n) return;
+  if(S.foto.didascalia)
+    n.innerHTML='Didascalia d\u2019archivio: <i>'+S.foto.didascalia+'</i>';
+  else if(!S.foto.segnatura)
+    n.innerHTML='Nessuna provenienza registrata. <b>Compilala prima di usare il rilievo nel libro.</b>';
+  else n.textContent='';
+}
+function riconosciFoto(nome){
+  const v=FOTOTECA.find(f=>f.chiave.test(nome||''));
+  if(v){ S.foto=Object.assign({},v.dati); }
+  else { S.foto={archivio:'',segnatura:'',autore:'',data:'',quota:null,licenza:'',url:'',didascalia:''}; }
+  scriviScheda();
+}
+// confronto fra quota dichiarata dall'archivio e quota calcolata: e' una verifica
+// esterna, perche' il calcolo non sa niente della didascalia
+function confrontoQuota(){
+  if(!S.sol || S.foto.quota==null) return null;
+  const C=centroCamera(S.sol.p); if(!C) return null;
+  const alt=C[2]*S.SW, dich=S.foto.quota;
+  return {alt, dich, scarto:(alt-dich)/dich*100};
+}
+
+
+/* ---------- RESTAURO FOTO ----------
+   "Restauro" e "ritaglio pulito" sono due cose diverse, tenute apparte apposta:
+   il restauro CUOCE i livelli in una nuova immagine di lavoro, a piena risoluzione,
+   e SOSTITUISCE quella su cui clicchi. L'originale (S.imgOriginale) non viene mai
+   riscritto: e' sempre li', un clic di distanza con "Mostra l'originale".
+   Il ritaglio invece non tocca mai l'immagine di lavoro: e' solo un'esportazione,
+   cosi' i punti gia' posati restano validi in ogni caso. */
+function restauraFoto(){
+  if(!S.img){ alert('Prima apri una foto.'); return; }
+  const src=S.img, w=src.width, h=src.height;
+  $('#stato').textContent='restauro in corso\u2026';
+  setTimeout(()=>{
+    try{
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      const x=c.getContext('2d');
+      x.imageSmoothingEnabled=false;
+      x.drawImage(src,0,0,w,h);
+      const id=x.getImageData(0,0,w,h), p=id.data, t=tabellaOscura();
+      for(let i=0;i<p.length;i+=4){ p[i]=t[p[i]]; p[i+1]=t[p[i+1]]; p[i+2]=t[p[i+2]]; }
+      x.putImageData(id,0,0);
+      S.img=c;
+      S.restaurata=true;
+      S.piramide=costruisciPiramide(c);
+      // i livelli sono ormai cotti dentro l'immagine: l'anteprima dal vivo torna a zero,
+      // altrimenti applicheresti la stessa correzione due volte
+      S.oscura={attiva:false,nero:0,bianco:255,gamma:1,rotta:false};
+      $('#cbOscura').checked=false; $('#ozNero').value=0; $('#ozBianco').value=255; $('#ozGamma').value=1;
+      $('#ozInfo').innerHTML='<b>Restauro applicato e cotto nell\u2019immagine di lavoro.</b> L\u2019originale scaricato resta intatto.';
+      $('#btnOriginale').disabled=false; $('#btnOriginale').textContent="Mostra l'originale";
+      $('#stato').textContent=`${S.nomeFile} \u2014 ${w}\u00d7${h} px \u00b7 restaurata`;
+      $('#stato').style.color='#7fbf6a';
+      disegna();
+    }catch(e){
+      $('#stato').textContent='immagine non leggibile'; $('#stato').style.color='#d4694f';
+      $('#ozInfo').innerHTML='<b>Il restauro non \u00e8 riuscito qui.</b> Il browser blocca la lettura dei pixel della tela. Apri lo strumento dal sito invece che dal file locale.';
+    }
+  },30);
+}
+
+function mostraOriginale(){
+  if(!S.imgOriginale) return;
+  const mostrandoOriginale = (S.img===S.imgOriginale);
+  if(mostrandoOriginale){
+    if(!S.restaurata){ alert('Non hai ancora premuto RESTAURO FOTO: non c\u2019\u00e8 nessuna versione restaurata da mostrare.'); return; }
+    // torniamo alla restaurata: va rifatta al volo, perche' non ne tengo due copie intere in memoria
+    restauraFotoSilenzioso(); return;
+  }
+  S.img=S.imgOriginale; S.piramide=costruisciPiramide(S.img);
+  $('#btnOriginale').textContent='Mostra la restaurata';
+  $('#stato').textContent=`${S.nomeFile} \u2014 ${S.img.width}\u00d7${S.img.height} px \u00b7 originale`;
+  $('#stato').style.color='';
+  disegna();
+}
+// come restauraFoto ma senza toccare i comandi del pannello: serve solo al toggle
+function restauraFotoSilenzioso(){
+  const src=S.imgOriginale, w=src.width, h=src.height;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d'); x.imageSmoothingEnabled=false; x.drawImage(src,0,0,w,h);
+  const id=x.getImageData(0,0,w,h), p=id.data, t=tabellaOscura();
+  for(let i=0;i<p.length;i+=4){ p[i]=t[p[i]]; p[i+1]=t[p[i+1]]; p[i+2]=t[p[i+2]]; }
+  x.putImageData(id,0,0);
+  S.img=c; S.piramide=costruisciPiramide(c);
+  $('#btnOriginale').textContent="Mostra l'originale";
+  $('#stato').textContent=`${S.nomeFile} \u2014 ${w}\u00d7${h} px \u00b7 restaurata`;
+  $('#stato').style.color='#7fbf6a';
+  disegna();
+}
+
+/* ---------- RITAGLIO DA PULIRE ----------
+   Solo esportazione: non cambia mai S.img, quindi i punti gia' posati restano
+   validi qualunque cosa tu faccia col ritaglio. */
+function attivaRitaglio(){
+  if(!S.img){ alert('Prima apri una foto.'); return; }
+  S.modoRitaglio=!S.modoRitaglio;
+  S.ritInizio=null; S.ritRett=null;
+  $('#btnRitaglio').textContent = S.modoRitaglio ? 'Annulla il rettaglio' : 'Disegna il rettaglio';
+  $('#btnRitaglioScarica').disabled=true;
+  $('#ritInfo').textContent = S.modoRitaglio ? 'Trascina sulla foto per disegnare il rettangolo.' : '';
+  disegna();
+}
+
+function disegnaRettaglio(){
+  if(!S.modoRitaglio || !S.ritRett) return;
+  const {x0,y0,x1,y1}=S.ritRett;
+  ctx.save();
+  ctx.fillStyle='rgba(216,178,90,.10)';
+  ctx.fillRect(Math.min(x0,x1),Math.min(y0,y1),Math.abs(x1-x0),Math.abs(y1-y0));
+  ctx.strokeStyle='#d8b25a'; ctx.lineWidth=1.6; ctx.setLineDash([6,4]);
+  ctx.strokeRect(Math.min(x0,x1),Math.min(y0,y1),Math.abs(x1-x0),Math.abs(y1-y0));
+  ctx.restore();
+}
+
+function scaricaRitaglio(){
+  if(!S.ritRett || !S.img) return;
+  const [ix0,iy0]=C2S(Math.min(S.ritRett.x0,S.ritRett.x1), Math.min(S.ritRett.y0,S.ritRett.y1));
+  const [ix1,iy1]=C2S(Math.max(S.ritRett.x0,S.ritRett.x1), Math.max(S.ritRett.y0,S.ritRett.y1));
+  const x0=Math.max(0,Math.round(ix0)), y0=Math.max(0,Math.round(iy0));
+  const x1=Math.min(S.img.width,Math.round(ix1)), y1=Math.min(S.img.height,Math.round(iy1));
+  const w=x1-x0, h=y1-y0;
+  if(w<4||h<4){ alert('Il rettangolo \u00e8 troppo piccolo.'); return; }
+  const MARGINE=42;
+  const c=document.createElement('canvas'); c.width=w; c.height=h+MARGINE;
+  const x=c.getContext('2d');
+  x.fillStyle='#0c0a07'; x.fillRect(0,0,w,h+MARGINE);
+  x.imageSmoothingEnabled=false;
+  x.drawImage(S.img, x0,y0,w,h, 0,0,w,h);
+  // se e' attesa un'anteprima dal vivo non ancora cotta, la applico anche al ritaglio:
+  // altrimenti quello che scarichi sarebbe diverso da quello che vedi a schermo
+  if(S.oscura.attiva && !S.oscura.rotta){
+    try{
+      const id=x.getImageData(0,0,w,h), p=id.data, t=tabellaOscura();
+      for(let i=0;i<p.length;i+=4){ p[i]=t[p[i]]; p[i+1]=t[p[i+1]]; p[i+2]=t[p[i+2]]; }
+      x.putImageData(id,0,0);
+    }catch(e){}
+  }
+  x.strokeStyle='#3a2f1a'; x.beginPath(); x.moveTo(0,h+.5); x.lineTo(w,h+.5); x.stroke();
+  x.fillStyle='#d8b25a'; x.font='600 12px monospace';
+  const riga1 = S.foto.segnatura || S.foto.archivio || S.nomeFile;
+  x.fillText(riga1, 10, h+18);
+  x.fillStyle='#a2977f'; x.font='10px monospace';
+  const riga2 = [S.foto.autore,S.foto.data].filter(Boolean).join(', ') +
+    (S.foto.licenza?'   \u00b7   '+S.foto.licenza:'') +
+    (S.restaurata?'   \u00b7   restauro: livelli rimappati':'');
+  x.fillText(riga2 || 'nessuna provenienza registrata \u2014 compilare la scheda della fotografia', 10, h+33);
+  const a=document.createElement('a');
+  a.href=c.toDataURL('image/png');
+  a.download='ritaglio_'+(S.nomeFile||'foto').replace(/\.[^.]+$/,'')+'_'+w+'x'+h+'.png';
+  a.click();
+}
+
+/* ---------- 10. INTERAZIONE ---------- */
+function costruisciPiramide(src){
+  // Ridisegnare 15 milioni di pixel a ogni movimento del mouse fa arrancare la lente.
+  // Tengo copie via via piu' piccole e uso quella giusta per lo zoom corrente.
+  const liv=[src];
+  let cur=src, giri=0;
+  try{
+    while(Math.max(cur.width,cur.height)>1100 && giri++<6){
+      const c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(cur.width/2));
+      c.height=Math.max(1,Math.round(cur.height/2));
+      const x=c.getContext('2d');
+      x.imageSmoothingEnabled=true; x.imageSmoothingQuality='high';
+      x.drawImage(cur,0,0,c.width,c.height);
+      liv.push(c); cur=c;
+    }
+  }catch(e){}
+  return liv;
+}
+
+function usaImmagine(sorgente, nome){
+  if((nome||'')!==S.nomeFile) riconosciFoto(nome);
+  S.img=sorgente;
+  S.imgOriginale=sorgente;           // l'originale non viene MAI più toccato
+  S.restaurata=false;
+  S.oscura={attiva:false,nero:0,bianco:255,gamma:1,rotta:false};
+  if($('#cbOscura')) $('#cbOscura').checked=false;
+  if($('#ozNero')){ $('#ozNero').value=0; $('#ozBianco').value=255; $('#ozGamma').value=1; $('#ozInfo').textContent=''; }
+  if($('#btnOriginale')){ $('#btnOriginale').disabled=true; $('#btnOriginale').textContent="Mostra l'originale"; }
+  S.piramide=costruisciPiramide(sorgente); S.nomeFile=nome||'immagine';
+  S.SU=Math.max(sorgente.width,sorgente.height); S.cx=sorgente.width/2; S.cy=sorgente.height/2;
+  const r=$('#tela').getBoundingClientRect();
+  S.vista.s=Math.min(r.width/sorgente.width,r.height/sorgente.height)*0.94;
+  S.vista.tx=(r.width-sorgente.width*S.vista.s)/2;
+  S.vista.ty=(r.height-sorgente.height*S.vista.s)/2;
+  $('#vuoto').style.display='none';
+  const lato=Math.max(sorgente.width,sorgente.height);
+  S.fattoreRis = 4961/lato;
+  $('#stato').textContent=`${S.nomeFile} \u2014 ${sorgente.width}\u00d7${sorgente.height} px`
+    + (lato<2500 ? `  \u00b7  RISOLUZIONE BASSA (${S.fattoreRis.toFixed(1)}\u00d7 peggio del pieno formato)` : '');
+  $('#stato').style.color = lato<2500 ? '#d4694f' : '';
+  ricalcola();
+}
+
+function nonLeggibile(nome,motivo){
+  $('#stato').style.color='#d4694f';
+  $('#stato').textContent='immagine non leggibile';
+  $('#vuoto').style.display='flex';
+  $('#vuoto').innerHTML=`<b>Non riesco ad aprire questo file</b>
+    <span>${motivo}<br><br>Se \u00e8 un TIFF fuori standard (a piastrelle, CMYK, o a 16 bit per canale),
+    convertilo in JPEG con un qualunque visualizzatore e ricaricalo: non perdi risoluzione.</span>`;
+}
+
+function caricaTiff(file){
+  $('#stato').style.color='';
+  $('#stato').textContent='decodifico il TIFF, un momento\u2026';
+  const rd=new FileReader();
+  rd.onerror=()=>nonLeggibile(file.name,'Il file non si lascia leggere dal disco.');
+  rd.onload=()=>{
+    setTimeout(()=>{
+      try{
+        const buf=rd.result;
+        const ifds=UTIF.decode(buf);
+        if(!ifds || !ifds.length) throw new Error('nessuna immagine dentro il file');
+        // prendo la pagina pi\u00f9 grande: certi TIFF d'archivio contengono anche l'anteprima
+        let k=0;
+        for(let i=1;i<ifds.length;i++)
+          if((ifds[i].width|0)*(ifds[i].height|0) > (ifds[k].width|0)*(ifds[k].height|0)) k=i;
+        UTIF.decodeImage(buf, ifds[k], ifds);
+        const w=ifds[k].width, h=ifds[k].height;
+        const rgba=UTIF.toRGBA8(ifds[k]);
+        if(!w||!h||!rgba||rgba.length<w*h*4) throw new Error('decodifica incompleta');
+        const cn=document.createElement('canvas'); cn.width=w; cn.height=h;
+        const cx=cn.getContext('2d');
+        const id=cx.createImageData(w,h);
+        id.data.set(rgba.subarray(0,w*h*4));
+        cx.putImageData(id,0,0);
+        usaImmagine(cn, file.name);
+      }catch(e){ nonLeggibile(file.name,'Il decodificatore TIFF si \u00e8 fermato: '+e.message+'.'); }
+    },30);
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+function caricaImmagine(file){
+  const nome=(file.name||'').toLowerCase();
+  if(/\.(tif|tiff)$/.test(nome) || file.type==='image/tiff'){ caricaTiff(file); return; }
+  if(/\.(heic|heif)$/.test(nome) || /image\/hei[cf]/.test(file.type||'')){
+    nonLeggibile(file.name,'Questo \u00e8 un HEIC/HEIF (formato tipico di iPhone). Nessun browser lo decodifica in pagina: su iPhone, condividi la foto scegliendo "Duplica come JPEG" o "Copia foto come JPEG" prima di caricarla; su Windows/Mac, aprila e salvala come JPEG.');
+    return;
+  }
+  const url=URL.createObjectURL(file);
+  const im=new Image();
+  im.onerror=()=>{ URL.revokeObjectURL(url);
+    nonLeggibile(file.name,'Il browser non riconosce questo formato. Vanno bene JPEG, PNG, WEBP, GIF, BMP e TIFF (anche d\u2019archivio, compressi o a 16 bit).'); };
+  im.onload=()=>usaImmagine(im, file.name);
+  im.src=url;
+}
+
+function apriQualsiasi(lista){
+  // un pulsante solo: due filtri diversi facevano sembrare vuota la cartella
+  // a chi premeva quello sbagliato
+  for(const f of lista){
+    const n=(f.name||'').toLowerCase();
+    if(n.endsWith('.json')) leggiScheda(f);
+    else if(/\.(jpg|jpeg|png|webp|gif|bmp|tif|tiff|avif|jfif|heic|heif)$/.test(n) || (f.type||'').startsWith('image/'))
+      caricaImmagine(f);
+    else nonLeggibile(f.name,'Non riconosco questo tipo di file. Servono una foto (JPEG, PNG, TIFF) o una scheda .json.');
+  }
+}
+function leggiScheda(f){
+  const rd=new FileReader();
+  rd.onload=()=>{try{
+    const d=JSON.parse(rd.result);
+    S.segni=d.segni||{}; if(d.usa) S.usa=Object.assign(S.usa,d.usa);
+    if(d.fotografia){Object.assign(S.foto,d.fotografia);scriviScheda();}
+    if(d.quote){Object.assign(Q,d.quote);
+      for(const k in Q){const el=document.getElementById('q_'+k); if(el) el.value=Q[k];}}
+    ricalcola();
+    $('#stato').style.color='';
+    if(!S.img) $('#stato').textContent='scheda con '+Object.keys(S.segni).length+' punti \u2014 ora apri la foto';
+  }catch(err){nonLeggibile(f.name,'La scheda non si \u00e8 aperta: '+err.message);}};
+  rd.readAsText(f);
+}
+$('#btnApri').onclick=()=>$('#filePic').click();
+$('#filePic').onchange=e=>{if(e.target.files.length)apriQualsiasi(e.target.files);e.target.value='';};
+$('#btnCarica').onclick=()=>$('#filePic').click();
+$('#fileJson').onchange=e=>{if(e.target.files.length)apriQualsiasi(e.target.files);e.target.value='';};
+$('#btnScheda').onclick=()=>{
+  const d={strumento:'Il Reticolo', data:new Date().toISOString(), immagine:S.nomeFile, fotografia:Object.assign({},S.foto),
+    quote:Object.assign({},Q), segni:S.segni, usa:S.usa,
+    soluzione:S.sol?{modo:S.sol.modo,p:S.sol.p}:null,
+    bersagli:S.sol?Object.fromEntries(BER.map(b=>[b.id,proiettaPx(S.sol.p,mondoB(b))])):null};
+  const bl=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(bl); a.download='reticolo_'+(S.nomeFile||'scheda')+'.json'; a.click();
+};
+$('#btnPulisci').onclick=()=>{if(confirm('Togliere tutti i punti posati?')){S.segni={};S.sel=null;ricalcola();}};
+$('#btnMC').onclick=monteCarlo;
+for(const k of ['cheope','chefren','micerino','sfinge','dosso','hCheope']){
+  const el=document.getElementById('q_'+k);
+  if(el) el.onchange=()=>{Q[k]=parseFloat(el.value)||Q[k];ricalcola();};
+}
+['cbBasi','cbLinea','cbLente','cbInverso','cbBussola'].forEach(i=>$('#'+i).onchange=disegna);
+$('#lenteF').oninput=disegna;
+
+
+$('#cbOscura').onchange=()=>{S.oscura.attiva=$('#cbOscura').checked;disegna();};
+for(const [id,campo] of [['ozNero','nero'],['ozBianco','bianco'],['ozGamma','gamma']])
+  $('#'+id).oninput=()=>{S.oscura[campo]=parseFloat($('#'+id).value); if(S.oscura.attiva) disegna();};
+$('#btnAuto').onclick=finestraAutomatica;
+$('#btnRestaura').onclick=restauraFoto;
+$('#btnOriginale').onclick=mostraOriginale;
+$('#btnRitaglio').onclick=attivaRitaglio;
+$('#btnRitaglioScarica').onclick=scaricaRitaglio;
+$('#btnReset').onclick=()=>{S.oscura={attiva:false,nero:0,bianco:255,gamma:1,rotta:S.oscura.rotta};
+  $('#ozNero').value=0; $('#ozBianco').value=255; $('#ozGamma').value=1;
+  $('#ozInfo').textContent='Anteprima azzerata. Il restauro gi\u00e0 cotto, se ce n\u2019\u00e8 uno, non viene toccato.'; disegna();};
+for(const k in CAMPI){const el=$('#'+CAMPI[k]); if(el) el.oninput=leggiSchedaFoto;}
+scriviScheda();
+$('#btnProvino').onclick=apriProvino;
+$('#provinoRivela').onclick=rivelaProvino;
+$('#provinoChiudi').onclick=()=>{$('#provino').style.display='none';};
+
+$('#btnRilievo').onclick=scattaRilievo;
+
+// tela
+cv.addEventListener('wheel',e=>{
+  e.preventDefault(); if(!S.img) return;
+  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  const [iu,iv]=C2S(x,y);
+  const k=Math.exp(-e.deltaY*0.0016);
+  S.vista.s=Math.max(0.03,Math.min(60,S.vista.s*k));
+  S.vista.tx=x-iu*S.vista.s; S.vista.ty=y-iv*S.vista.s;
+  disegna();
+},{passive:false});
+
+cv.addEventListener('mousedown',e=>{
+  if(!S.img) return;
+  const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  if(S.modoRitaglio){ S.ritInizio={x,y}; S.ritRett={x0:x,y0:y,x1:x,y1:y}; return; }
+  if(e.button===1||e.button===2||e.shiftKey){S.pan={x,y,tx:S.vista.tx,ty:S.vista.ty};return;}
+  // prendi un segno vicino
+  for(const c of CAT){
+    const s=S.segni[c.id]; if(!s) continue;
+    const [a,b]=S2C(s.u,s.v);
+    if(Math.hypot(a-x,b-y)<10){S.trascina=c.id;S.sel=c.id;disegnaElenco();disegna();return;}
+  }
+  if($('#cbInverso').checked && S.sol){
+    const [iu,iv]=C2S(x,y);
+    leggiCoordinate(iu,iv); return;
+  }
+  S.forsePosa={x,y};
+  if(S.sel){
+    const [iu,iv]=C2S(x,y);
+    S.segni[S.sel]={u:iu,v:iv};
+    S.appenaPosato=S.sel;
+    S.sel=null;              // il punto e' fissato: il prossimo clic non lo sposta piu'
+    setTimeout(()=>{S.appenaPosato=null;disegna();},1400);
+    ricalcola();
+  }
+  S.pan={x,y,tx:S.vista.tx,ty:S.vista.ty};
+});
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('mousemove',e=>{
+  const r=cv.getBoundingClientRect();
+  S.mouse={x:e.clientX-r.left,y:e.clientY-r.top};
+  if(S.modoRitaglio && S.ritInizio){ S.ritRett={x0:S.ritInizio.x,y0:S.ritInizio.y,x1:S.mouse.x,y1:S.mouse.y}; disegna(); return; }
+  if(S.pan){S.vista.tx=S.pan.tx+(S.mouse.x-S.pan.x);S.vista.ty=S.pan.ty+(S.mouse.y-S.pan.y);disegna();return;}
+  if(S.trascina){
+    const [iu,iv]=C2S(S.mouse.x,S.mouse.y);
+    S.segni[S.trascina]={u:iu,v:iv}; disegna(); return;
+  }
+  if(S.img && S.mouse.x>=0&&S.mouse.y>=0&&
+     S.mouse.x<=cv.clientWidth&&S.mouse.y<=cv.clientHeight) chiediDisegno();
+});
+window.addEventListener('mouseup',()=>{
+  if(S.modoRitaglio && S.ritInizio){
+    S.ritInizio=null;
+    const largo = S.ritRett && Math.abs(S.ritRett.x1-S.ritRett.x0)>6 && Math.abs(S.ritRett.y1-S.ritRett.y0)>6;
+    $('#btnRitaglioScarica').disabled=!largo;
+    $('#ritInfo').textContent = largo ? 'Pronto. Puoi ridisegnarlo o scaricarlo.' : 'Troppo piccolo: ridisegnalo.';
+    return;
+  }
+  if(S.trascina){S.trascina=null;ricalcola();S.forsePosa=null;S.pan=null;return;}
+  // se il puntatore non si e' quasi mosso, era un clic, non una trascinata
+  if(S.forsePosa && S.mouse && !S.sel && S.img &&
+     Math.hypot(S.mouse.x-S.forsePosa.x, S.mouse.y-S.forsePosa.y)<4){
+    const [iu,iv]=C2S(S.forsePosa.x,S.forsePosa.y);
+    if(iu>=0&&iv>=0&&iu<=S.img.width&&iv<=S.img.height){
+      const scelta=assegnaClic(iu,iv);
+      if(scelta && scelta.ambiguo){
+        S.ambiguo=Date.now();
+        setTimeout(()=>{S.ambiguo=0;disegna();},2600);
+        disegna();
+      } else if(scelta){
+        S.segni[scelta.id]={u:iu,v:iv};
+        S.usa[scelta.id]=true;
+        S.appenaPosato=scelta.id;
+        setTimeout(()=>{S.appenaPosato=null;disegna();},1800);
+        ricalcola();
+      }
+    }
+  }
+  S.forsePosa=null; S.pan=null;
+});
+window.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  const k=e.key.toLowerCase();
+  if(k==='p'){scattaRilievo();e.preventDefault();return;}
+  if(k==='n'){
+    S.oscura.attiva=false; $('#cbOscura').checked=false; disegna();
+    e.preventDefault(); return;
+  }
+  if(k==='f'){
+    if(S.img){
+      const r=$('#tela').getBoundingClientRect();
+      S.vista.s=Math.min(r.width/S.img.width,r.height/S.img.height)*0.94;
+      S.vista.tx=(r.width-S.img.width*S.vista.s)/2;
+      S.vista.ty=(r.height-S.img.height*S.vista.s)/2;
+      disegna();
+    }
+    e.preventDefault(); return;
+  }
+  if(k==='+'||k==='='||k==='-'||k==='_'){
+    const f=(k==='-'||k==='_')?1/1.3:1.3;
+    const cx=cv.clientWidth/2, cy=cv.clientHeight/2, [iu,iv]=C2S(cx,cy);
+    S.vista.s=Math.max(0.03,Math.min(60,S.vista.s*f));
+    S.vista.tx=cx-iu*S.vista.s; S.vista.ty=cy-iv*S.vista.s;
+    disegna(); e.preventDefault(); return;
+  }
+  if(!S.sel||!S.segni[S.sel]) return;
+  const d=e.shiftKey?0.2:1;
+  const s=S.segni[S.sel];
+  if(e.key==='ArrowLeft'){s.u-=d/S.vista.s;} else if(e.key==='ArrowRight'){s.u+=d/S.vista.s;}
+  else if(e.key==='ArrowUp'){s.v-=d/S.vista.s;} else if(e.key==='ArrowDown'){s.v+=d/S.vista.s;}
+  else return;
+  e.preventDefault(); ricalcola();
+});
+
+// trascinamento file e incolla
+['dragover','drop'].forEach(t=>document.addEventListener(t,e=>e.preventDefault()));
+document.addEventListener('drop',e=>{
+  if(e.dataTransfer.files.length) apriQualsiasi(e.dataTransfer.files);
+});
+document.addEventListener('paste',e=>{
+  for(const it of e.clipboardData.items)
+    if(it.type.startsWith('image/')){caricaImmagine(it.getAsFile());break;}
+});
+
+function leggiCoordinate(iu,iv){
+  // inversione sul piano del suolo (Z = quota indicata)
+  const p=S.sol.p, [un,vn]=toNorm(iu,iv);
+  const Zq=(Q.dosso-Q.cheope)/S.SW; // il piano letto \u00e8 quello del dosso
+  // risolve  (h1 X + h2 Y + h3 + w1 Z) - u (h7 X + h8 Y + 1 + w3 Z) = 0  e analoga
+  const A=[p[0]-un*p[6], p[1]-un*p[7], p[3]-vn*p[6], p[4]-vn*p[7]];
+  const b=[un*(1+p[10]*Zq)-p[2]-p[8]*Zq, vn*(1+p[10]*Zq)-p[5]-p[9]*Zq];
+  const det=A[0]*A[3]-A[1]*A[2];
+  if(Math.abs(det)<1e-12){alert('Inversione impossibile in questo punto.');return;}
+  const X=( b[0]*A[3]-A[1]*b[1])/det, Y=(A[0]*b[1]-b[0]*A[2])/det;
+  const E=X*S.SW, N=Y*S.SW, ll=LL(E,N);
+  const dC=Math.hypot(E,N); let az=Math.atan2(E,N)*180/Math.PI; if(az<0)az+=360;
+  alert(`Punto letto sul piano a quota ${Q.dosso} m s.l.m.\n\n`+
+    `${ll.lat.toFixed(6)} / ${ll.lon.toFixed(6)}\n`+
+    `${gms(ll.lat,'N','S')}  ${gms(ll.lon,'E','O')}\n\n`+
+    `da centro Cheope: ${dC.toFixed(1)} m ad azimut ${az.toFixed(2)}°\n`+
+    `dal punto di Piras: ${Math.hypot(E-EN(BER[0].lat,BER[0].lon).E,N-EN(BER[0].lat,BER[0].lon).N).toFixed(1)} m`);
+}
+
+/* ---------- 11. RILIEVO ---------- */
+function scattaRilievo(){
+  if(!S.img) return;
+  const H=170, w=cv.clientWidth, h=cv.clientHeight;
+  const o=document.createElement('canvas');
+  o.width=w; o.height=h+H;
+  const c=o.getContext('2d');
+  c.fillStyle='#0c0a07'; c.fillRect(0,0,w,h+H);
+  c.drawImage(cv,0,0,w,h);
+  c.strokeStyle='#3a2f1a'; c.beginPath(); c.moveTo(0,h+.5); c.lineTo(w,h+.5); c.stroke();
+  c.fillStyle='#d8b25a'; c.font='600 13px monospace';
+  c.fillText('IL RETICOLO — rilievo georeferenziato · suite Precessio',14,h+24);
+  c.font='11px monospace'; c.fillStyle='#c9bda4';
+  const L=[];
+  L.push('immagine: '+S.nomeFile+'   \u00b7   rilievo del '+new Date().toLocaleString('it-IT'));
+  if(S.foto.segnatura||S.foto.archivio)
+    L.push('provenienza: '+[S.foto.autore,S.foto.data,S.foto.archivio].filter(Boolean).join(', ')+
+           (S.foto.segnatura?'   \u00b7   '+S.foto.segnatura:'')+
+           (S.foto.licenza?'   \u00b7   '+S.foto.licenza:''));
+  else L.push('provenienza: NON REGISTRATA \u2014 compilare la scheda della fotografia prima di pubblicare');
+  if(S.sol){
+    const pt=puntiAttivi();
+    const rms=Math.sqrt(pt.reduce((s,q)=>s+S.res[q.id]**2,0)/pt.length);
+    const loov=Object.values(S.loo);
+    const looR=loov.length?Math.sqrt(loov.reduce((s,x)=>s+x*x,0)/loov.length):null;
+    L.push(`punti: ${S.sol.nSuolo} di suolo + ${S.sol.nAlti} cime   ·   modello: ${S.sol.modo}`);
+    L.push(`scarto di adattamento ${rms.toFixed(1)} px`+(looR!==null?`   ·   lasciando fuori uno ${looR.toFixed(1)} px`:''));
+    const C=centroCamera(S.sol.p);
+    if(C){
+      const alt=C[2]*S.SW, e=C[0]*S.SW, n=C[1]*S.SW;
+      let az=Math.atan2(e,n)*180/Math.PI; if(az<0)az+=360;
+      const cq2=confrontoQuota();
+      L.push(`camera: quota ${alt.toFixed(0)} m sul piano di base, a ${Math.hypot(e,n).toFixed(0)} m da Cheope, azimut ${az.toFixed(1)}\u00b0`
+        + (cq2?`   \u00b7   l'archivio dichiara ${cq2.dich.toFixed(0)} m (scarto ${cq2.scarto>0?'+':''}${cq2.scarto.toFixed(0)}%)`:''));
+    }
+    const m=mondoB(BER[0]), pp=proiettaPx(S.sol.p,m), mp=scalaMetri(S.sol.p,m);
+    L.push(`punto di Piras (29,98003 / 31,12626) → pixel ${pp[0].toFixed(0)}, ${pp[1].toFixed(0)}   ·   scala ${mp.toFixed(2)} m/px`);
+    if(S.mc&&S.mc.ell['piras']){
+      const e=S.mc.ell['piras'];
+      L.push(`incertezza da clic (95%, ${S.mc.n} estrazioni): ±${(e.a*mp).toFixed(0)} × ${(e.b*mp).toFixed(0)} m`);
+    }
+    const fuori=CAT.filter(x=>S.segni[x.id]&&!S.usa[x.id]);
+    for(const x of fuori){
+      const [a,b]=proiettaPx(S.sol.p,mondo(x)), s=S.segni[x.id];
+      const d=Math.hypot(a-s.u,b-s.v);
+      L.push(`prova indipendente — ${x.nome}: previsto a ${(d*scalaMetri(S.sol.p,mondo(x))).toFixed(0)} m dall'osservato`);
+    }
+  } else L.push('nessuna soluzione: servono almeno 4 spigoli di base.');
+  L.push('coordinate dei monumenti misurate su Google Earth Pro; quote delle basi: stime dichiarate, non misurate.');
+  L.forEach((s,i)=>c.fillText(s,14,h+46+i*16));
+  const a=document.createElement('a');
+  a.href=o.toDataURL('image/png');
+  a.download='reticolo_'+(S.nomeFile.replace(/\.[^.]+$/,'')||'rilievo')+'.png';
+  a.click();
+}
+
+/* ---------- avvio ---------- */
+window.addEventListener('resize',ridimensiona);
+disegnaElenco(); ridimensiona();
+
+</script>
+</body>
+</html>
